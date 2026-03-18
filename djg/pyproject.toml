@@ -1,0 +1,24 @@
+[project]
+name = "djg"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "ro9aine"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "django (==5.2.9)"
+]
+
+[project.scripts]
+manage = "shopcli.manage:main"
+
+[tool.poetry]
+packages = [
+    { include = "shopcli" }
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

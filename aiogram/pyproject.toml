@@ -1,0 +1,27 @@
+[project]
+name = "telegram-shop-bot-aiogram"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "ro9aine"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiogram (>=3.22.0,<4.0.0)",
+    "pydantic-settings (>=2.11.0,<3.0.0)",
+    "watchfiles (>=1.1.1,<2.0.0)",
+]
+
+[project.scripts]
+bot = "app.main:run"
+bot-dev = "app.dev:run"
+
+[tool.poetry]
+packages = [
+    { include = "app" }
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
