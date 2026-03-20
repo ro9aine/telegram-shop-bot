@@ -1,3 +1,11 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { browserApi } from "../lib/http";
+
 type Category = {
   id: number;
   title: string;
@@ -21,10 +29,8 @@ type ProductsPayload = {
 };
 
 type ProductDetailPayload = {
-  item: Product;
+  item: Product | null;
 };
-
-const API_BASE = process.env.CATALOG_API_BASE_URL ?? "http://djg:8000";
 
 function truncate(text: string, limit: number): string {
   const normalized = text.trim();
@@ -34,63 +40,83 @@ function truncate(text: string, limit: number): string {
   return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
 
-async function loadCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_BASE}/api/catalog/categories/`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    return [];
-  }
-  const payload = (await response.json()) as { categories?: Category[] };
-  return payload.categories ?? [];
-}
-
-async function loadProducts(categoryId: number | null, page: number): Promise<ProductsPayload> {
+function buildCatalogHref(page: number, categoryId: number | null): string {
   const params = new URLSearchParams();
-  params.set("page", String(page));
-  params.set("page_size", "12");
+  if (page > 1) {
+    params.set("page", String(page));
+  }
   if (categoryId !== null) {
-    params.set("category_id", String(categoryId));
+    params.set("category", String(categoryId));
   }
-
-  const response = await fetch(`${API_BASE}/api/catalog/products/?${params.toString()}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    return { items: [], pagination: { page: 1, total_pages: 1 } };
-  }
-  return (await response.json()) as ProductsPayload;
+  const query = params.toString();
+  return query ? `/?${query}` : "/";
 }
 
-async function loadProduct(productId: number | null): Promise<Product | null> {
-  if (!productId || !Number.isFinite(productId)) {
-    return null;
-  }
-  const response = await fetch(`${API_BASE}/api/catalog/products/${productId}/`, {
-    cache: "no-store",
+export default function HomePage() {
+  const searchParams = useSearchParams();
+  const selectedCategoryIdRaw = searchParams.get("category");
+  const pageRaw = searchParams.get("page");
+  const selectedProductIdRaw = searchParams.get("product");
+
+  const selectedCategoryId = selectedCategoryIdRaw ? Number(selectedCategoryIdRaw) : null;
+  const page = pageRaw ? Math.max(1, Number(pageRaw)) : 1;
+  const selectedProductId = selectedProductIdRaw ? Number(selectedProductIdRaw) : null;
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [productsPayload, setProductsPayload] = useState<ProductsPayload>({
+    items: [],
+    pagination: { page: 1, total_pages: 1 },
   });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = (await response.json()) as ProductDetailPayload;
-  return payload.item ?? null;
-}
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ category?: string; page?: string; product?: string }>;
-}) {
-  const params = (await searchParams) ?? {};
-  const selectedCategoryId = params.category ? Number(params.category) : null;
-  const page = params.page ? Math.max(1, Number(params.page)) : 1;
-  const selectedProductId = params.product ? Number(params.product) : null;
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    params.set("page", String(Number.isFinite(page) ? page : 1));
+    params.set("page_size", "12");
+    if (selectedCategoryId !== null && Number.isFinite(selectedCategoryId)) {
+      params.set("category_id", String(selectedCategoryId));
+    }
 
-  const [categories, productsPayload, selectedProduct] = await Promise.all([
-    loadCategories(),
-    loadProducts(Number.isFinite(selectedCategoryId) ? selectedCategoryId : null, page),
-    loadProduct(Number.isFinite(selectedProductId) ? selectedProductId : null),
-  ]);
+    const productIdForQuery =
+      selectedProductId !== null && Number.isFinite(selectedProductId) ? selectedProductId : null;
+
+    Promise.all([
+      browserApi.get<{ categories?: Category[] }>("/catalog/categories/", { signal: controller.signal }),
+      browserApi.get<ProductsPayload>(`/catalog/products/?${params.toString()}`, { signal: controller.signal }),
+      productIdForQuery
+        ? browserApi.get<ProductDetailPayload>(`/catalog/products/${productIdForQuery}/`, { signal: controller.signal })
+        : Promise.resolve(null),
+    ])
+      .then(([categoriesResponse, productsResponse, productResponse]) => {
+        if (categoriesResponse.status >= 200 && categoriesResponse.status < 300) {
+          setCategories(categoriesResponse.data.categories ?? []);
+        } else {
+          setCategories([]);
+        }
+
+        if (productsResponse.status >= 200 && productsResponse.status < 300) {
+          setProductsPayload(productsResponse.data);
+        } else {
+          setProductsPayload({ items: [], pagination: { page: 1, total_pages: 1 } });
+        }
+
+        if (productResponse && productResponse.status >= 200 && productResponse.status < 300) {
+          setSelectedProduct(productResponse.data.item ?? null);
+        } else {
+          setSelectedProduct(null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setCategories([]);
+          setProductsPayload({ items: [], pagination: { page: 1, total_pages: 1 } });
+          setSelectedProduct(null);
+        }
+      });
+
+    return () => controller.abort();
+  }, [page, selectedCategoryId, selectedProductId]);
 
   const currentPage = productsPayload.pagination.page || 1;
   const totalPages = productsPayload.pagination.total_pages || 1;
@@ -103,56 +129,53 @@ export default async function HomePage({
       </header>
 
       <section className="filters">
-        <a className={!selectedCategoryId ? "chip chip-active" : "chip"} href="/">
+        <Link className={!selectedCategoryId ? "chip chip-active" : "chip"} href="/">
           All
-        </a>
+        </Link>
         {categories.map((category) => (
-          <a
+          <Link
             className={selectedCategoryId === category.id ? "chip chip-active" : "chip"}
             href={`/?category=${category.id}`}
             key={category.id}
           >
             {category.title}
-          </a>
+          </Link>
         ))}
       </section>
 
       <section className="grid">
         {selectedProduct ? (
-          <article className="card card-selected" key={`selected-${selectedProduct.id}`}>
+          <Link
+            className="card card-selected card-clickable"
+            href={`/product/${selectedProduct.id}`}
+            key={`selected-${selectedProduct.id}`}
+          >
             {selectedProduct.images[0] ? (
               <img alt={selectedProduct.title} className="card-image" src={selectedProduct.images[0]} />
             ) : null}
             <h2>{selectedProduct.title}</h2>
-            {selectedProduct.description ? <p>{truncate(selectedProduct.description, 120)}</p> : null}
             <div className="price">{selectedProduct.price}</div>
-            <div className="card-actions">
-              <a className="card-link" href={`/product/${selectedProduct.id}`}>
-                Open details
-              </a>
-            </div>
-          </article>
+          </Link>
         ) : null}
         {productsPayload.items.map((item) => (
-          <article className="card" key={item.id}>
+          <Link className="card card-clickable" href={`/product/${item.id}`} key={item.id}>
             {item.images[0] ? <img alt={item.title} className="card-image" src={item.images[0]} /> : null}
-            <h2>{item.title}</h2>
-            {item.description ? <p>{truncate(item.description, 120)}</p> : null}
+            <h2 title={item.title}>{truncate(item.title, 90)}</h2>
             <div className="price">{item.price}</div>
-            <div className="card-actions">
-              <a className="card-link" href={`/product/${item.id}`}>
-                Open details
-              </a>
-            </div>
-          </article>
+          </Link>
         ))}
       </section>
 
       <nav className="pager">
         {currentPage > 1 ? (
-          <a href={`/?${new URLSearchParams({ page: String(currentPage - 1), ...(selectedCategoryId ? { category: String(selectedCategoryId) } : {}) }).toString()}`}>
+          <Link
+            href={buildCatalogHref(
+              currentPage - 1,
+              Number.isFinite(selectedCategoryId ?? Number.NaN) ? selectedCategoryId : null,
+            )}
+          >
             Back
-          </a>
+          </Link>
         ) : (
           <span />
         )}
@@ -160,9 +183,14 @@ export default async function HomePage({
           Page {currentPage}/{totalPages}
         </span>
         {currentPage < totalPages ? (
-          <a href={`/?${new URLSearchParams({ page: String(currentPage + 1), ...(selectedCategoryId ? { category: String(selectedCategoryId) } : {}) }).toString()}`}>
+          <Link
+            href={buildCatalogHref(
+              currentPage + 1,
+              Number.isFinite(selectedCategoryId ?? Number.NaN) ? selectedCategoryId : null,
+            )}
+          >
             Forward
-          </a>
+          </Link>
         ) : (
           <span />
         )}

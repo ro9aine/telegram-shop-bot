@@ -82,4 +82,7 @@ async def handle_message(message: Message) -> None:
         message.from_user.id if message.from_user else None,
         message.text,
     )
-    await message.answer(f"You said: {message.text}")
+    await message.answer(
+        "I did not understand that message.\n"
+        "Use /catalog to browse products or /start to begin.",
+    )

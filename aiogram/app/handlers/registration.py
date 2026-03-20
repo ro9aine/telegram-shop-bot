@@ -1,10 +1,12 @@
 import logging
 import asyncio
+import re
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, ReplyKeyboardRemove
 
+from app.handlers.catalog import show_product_from_start
 from app.config import get_settings
 from app.keyboards import contact_request_keyboard
 from app.storage.profiles import get_profile, save_profile, sync_profile
@@ -13,9 +15,35 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+def _extract_start_product_id(text: str | None) -> int | None:
+    if not text:
+        return None
+    parts = text.strip().split(maxsplit=1)
+    if len(parts) < 2:
+        return None
+    start_arg = parts[1].strip()
+    if not start_arg:
+        return None
+
+    # Supported variants: "<product_id>" and "product_<product_id>"
+    match = re.fullmatch(r"(?:product_)?(\d+)", start_arg)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
     logger.info("Handled /start for chat_id=%s", message.chat.id)
+    product_id = _extract_start_product_id(message.text)
+    if product_id is not None:
+        shown = await show_product_from_start(message, product_id)
+        if shown:
+            return
+
     user_id = message.from_user.id if message.from_user else None
     if user_id is None:
         await message.answer("Cannot identify user.")

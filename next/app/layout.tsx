@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import "antd/dist/reset.css";
 import "./globals.css";
+import BottomNav from "./components/bottom-nav";
 
 export const metadata: Metadata = {
   title: "Telegram Shop WebApp",
@@ -13,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <BottomNav />
+      </body>
     </html>
   );
 }

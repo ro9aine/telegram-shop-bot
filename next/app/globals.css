@@ -16,6 +16,11 @@ body {
   font-family: "Segoe UI", Tahoma, sans-serif;
   background: radial-gradient(circle at 10% 10%, #fffdf7, var(--bg));
   color: var(--text);
+  overflow-y: scroll;
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 * {
@@ -25,7 +30,7 @@ body {
 .page {
   max-width: 980px;
   margin: 0 auto;
-  padding: 28px 16px 40px;
+  padding: 28px 16px 96px;
 }
 
 .hero h1 {
@@ -65,7 +70,7 @@ body {
   margin-top: 20px;
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .card {
@@ -73,6 +78,12 @@ body {
   background: var(--paper);
   border-radius: 14px;
   overflow: hidden;
+}
+
+.card-clickable {
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
 .card-selected {
@@ -89,33 +100,15 @@ body {
 
 .card h2 {
   margin: 12px 12px 0;
-  font-size: 18px;
-}
-
-.card p {
-  margin: 8px 12px 0;
-  color: var(--muted);
-  font-size: 14px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  font-size: 16px;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .price {
   margin: 14px 12px 12px;
   font-weight: 700;
-}
-
-.card-actions {
-  margin: 0 12px 12px;
-}
-
-.card-link {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 14px;
 }
 
 .pager {
@@ -134,4 +127,178 @@ body {
 
 .pager a:last-child {
   justify-self: end;
+}
+
+.product-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 16px 12px 96px;
+}
+
+.product-shell {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  padding: 12px;
+}
+
+.product-slider {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.thumb {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 10px;
+  padding: 0;
+  width: 72px;
+  min-width: 72px;
+  height: 72px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.product-main-photo {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f1efe9;
+}
+
+.product-back-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.product-back-btn {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(2px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.product-slide {
+  width: 100%;
+}
+
+.product-main-photo img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.product-slide-empty {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.product-content {
+  padding: 12px 6px 4px;
+}
+
+.product-content h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.product-price {
+  margin-top: 10px;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.product-description {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-description-expanded {
+  display: block;
+}
+
+.product-expand-btn {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(860px, 100%);
+  background: rgba(255, 253, 247, 0.96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+
+.bottom-nav-item {
+  text-align: center;
+  text-decoration: none;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 12px 8px;
+  border-radius: 12px;
+  font-size: 28px;
+  line-height: 1;
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+}
+
+.bottom-nav-item-active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }

@@ -135,16 +135,25 @@ def catalog_products_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def product_card_keyboard(*, product_id: int, category_id: int, page: int, webapp_url: str) -> InlineKeyboardMarkup:
+def product_card_keyboard(
+    *,
+    product_id: int,
+    category_id: int | None,
+    page: int | None,
+    webapp_url: str,
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text="Add to cart", callback_data=CartAddCallback(product_id=product_id).pack())],
-        [
-            InlineKeyboardButton(
-                text="Back to products",
-                callback_data=CatalogPageCallback(category_id=category_id, page=page).pack(),
-            )
-        ],
     ]
+    if category_id is not None and page is not None:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Back to products",
+                    callback_data=CatalogPageCallback(category_id=category_id, page=page).pack(),
+                )
+            ]
+        )
     webapp_btn = _webapp_button(_build_product_url(webapp_url, product_id))
     if webapp_btn is not None:
         rows.append([webapp_btn])

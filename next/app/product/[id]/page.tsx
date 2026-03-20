@@ -1,3 +1,11 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { browserApi } from "../../../lib/http";
+import ProductDetailClient from "./product-detail-client";
+
 type Product = {
   id: number;
   title: string;
@@ -7,67 +15,67 @@ type Product = {
 };
 
 type ProductDetailPayload = {
-  item: Product;
+  item: Product | null;
 };
 
-const API_BASE = process.env.CATALOG_API_BASE_URL ?? "http://djg:8000";
+export default function ProductPage() {
+  const params = useParams<{ id: string }>();
+  const productId = Number(params.id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
-async function loadProduct(id: number): Promise<Product | null> {
-  const response = await fetch(`${API_BASE}/api/catalog/products/${id}/`, {
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = (await response.json()) as ProductDetailPayload;
-  return payload.item ?? null;
-}
+  useEffect(() => {
+    if (!Number.isFinite(productId)) {
+      setNotFound(true);
+      setProduct(null);
+      return;
+    }
 
-export default async function ProductPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const productId = Number(id);
+    const controller = new AbortController();
+    browserApi
+      .get<ProductDetailPayload>(`/catalog/products/${productId}/`, { signal: controller.signal })
+      .then((response) => {
+        if (response.status < 200 || response.status >= 300 || !response.data.item) {
+          setNotFound(true);
+          setProduct(null);
+          return;
+        }
+        setNotFound(false);
+        setProduct(response.data.item);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setNotFound(true);
+          setProduct(null);
+        }
+      });
+
+    return () => controller.abort();
+  }, [productId]);
+
   if (!Number.isFinite(productId)) {
     return (
       <main className="page">
         <p>Invalid product id.</p>
-        <a href="/">Back to catalog</a>
       </main>
     );
   }
 
-  const product = await loadProduct(productId);
-  if (!product) {
+  if (notFound) {
     return (
       <main className="page">
         <p>Product not found.</p>
-        <a href="/">Back to catalog</a>
       </main>
     );
   }
 
-  return (
-    <main className="page">
-      <a href="/">Back to catalog</a>
-      <article className="card card-selected" style={{ marginTop: 12 }}>
-        {product.images[0] ? <img alt={product.title} className="card-image" src={product.images[0]} /> : null}
-        <h1 style={{ margin: "12px 12px 0", fontSize: 28 }}>{product.title}</h1>
-        {product.description ? <p style={{ marginBottom: 0, WebkitLineClamp: "unset" }}>{product.description}</p> : null}
-        <div className="price">{product.price}</div>
-      </article>
+  if (!product) {
+    return (
+      <main className="page">
+        <p>Loading...</p>
+      </main>
+    );
+  }
 
-      {product.images.length > 1 ? (
-        <section className="grid" style={{ marginTop: 14 }}>
-          {product.images.slice(1).map((image, idx) => (
-            <article className="card" key={`${product.id}-${idx}`}>
-              <img alt={`${product.title} ${idx + 2}`} className="card-image" src={image} />
-            </article>
-          ))}
-        </section>
-      ) : null}
-    </main>
-  );
+  return <ProductDetailClient product={product} />;
 }
