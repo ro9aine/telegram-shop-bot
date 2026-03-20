@@ -26,7 +26,11 @@ SECRET_KEY = 'django-insecure-#*x1#t4&c7gr+suioo(0i(2#ake@j6j^1k$ql^osn3tct!1xvp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS_ENV = os.environ.get("DJANGO_ALLOWED_HOSTS", "")
+if ALLOWED_HOSTS_ENV.strip():
+    ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_ENV.split(",") if host.strip()]
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "djg"]
 
 
 # Application definition
@@ -74,12 +78,26 @@ WSGI_APPLICATION = 'shop.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "").strip()
+
+if POSTGRES_HOST:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "shop"),
+            "USER": os.environ.get("POSTGRES_USER", "shop"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "shop"),
+            "HOST": POSTGRES_HOST,
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation

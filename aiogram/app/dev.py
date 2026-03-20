@@ -13,3 +13,7 @@ def run() -> None:
         target=_run_bot,
         watch_filter=None,
     )
+
+
+if __name__ == "__main__":
+    run()

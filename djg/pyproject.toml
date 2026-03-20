@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-manage = "shopcli.manage:main"
+manage = "shop.manage:main"
 
 [tool.poetry]
 packages = [

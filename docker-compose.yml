@@ -1,0 +1,117 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+      POSTGRES_USER: ${POSTGRES_USER:-shop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shop}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shop} -d ${POSTGRES_DB:-shop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  aiogram:
+    build:
+      context: ./aiogram
+      dockerfile: Dockerfile.dev
+    container_name: aiogram
+    working_dir: /app
+    volumes:
+      - ./aiogram:/app
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DJANGO_API_BASE_URL: ${DJANGO_API_BASE_URL:-http://djg:8000}
+      WEBAPP_CATALOG_URL: ${WEBAPP_CATALOG_URL:-}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
+    command: python -m app.dev
+    depends_on:
+      - djg
+    develop:
+      watch:
+        - action: sync
+          path: ./aiogram
+          target: /app
+          ignore:
+            - .venv/
+            - __pycache__/
+            - .pytest_cache/
+        - action: rebuild
+          path: ./aiogram/requirements.txt
+        - action: rebuild
+          path: ./aiogram/pyproject.toml
+
+  djg:
+    build:
+      context: ./djg
+      dockerfile: Dockerfile.dev
+    container_name: djg
+    working_dir: /app
+    volumes:
+      - ./djg:/app
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+      POSTGRES_USER: ${POSTGRES_USER:-shop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shop}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python shop/manage.py migrate &&
+      python shop/manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./djg
+          target: /app
+          ignore:
+            - .venv/
+            - __pycache__/
+            - .pytest_cache/
+            - shop/db.sqlite3
+        - action: rebuild
+          path: ./djg/requirements.txt
+        - action: rebuild
+          path: ./djg/pyproject.toml
+
+  next:
+    build:
+      context: ./next
+      dockerfile: Dockerfile.dev
+    container_name: next
+    working_dir: /app
+    volumes:
+      - ./next:/app
+      - next_node_modules:/app/node_modules
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+      CATALOG_API_BASE_URL: ${CATALOG_API_BASE_URL:-http://djg:8000}
+    ports:
+      - "3000:3000"
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+    depends_on:
+      - djg
+    develop:
+      watch:
+        - action: sync
+          path: ./next
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./next/package.json
+
+volumes:
+  next_node_modules:
+  postgres_data:

@@ -1,4 +1,27 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    WebAppInfo,
+)
+from urllib.parse import urlparse, urlunparse
+
+from app.callbacks import CatalogBackCallback, CatalogCategoryCallback, CatalogPageCallback, CatalogProductCallback, CartAddCallback
+
+
+def _webapp_button(url: str) -> InlineKeyboardButton | None:
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme != "https" or not parsed.netloc:
+        return None
+    return InlineKeyboardButton(text="Open in WebApp", web_app=WebAppInfo(url=url))
+
+
+def _build_product_url(url: str, product_id: int) -> str:
+    parsed = urlparse(url)
+    base_path = (parsed.path or "").rstrip("/")
+    product_path = f"{base_path}/product/{product_id}"
+    return urlunparse(parsed._replace(path=product_path))
 
 
 def contact_request_keyboard() -> ReplyKeyboardMarkup:
@@ -22,3 +45,108 @@ def subscription_prompt(channels: list[dict[str, str]]) -> InlineKeyboardMarkup 
         return None
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def catalog_categories_keyboard(
+    categories: list[dict],
+    webapp_url: str,
+    parent_id: int | None = None,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for category in categories:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=category["title"],
+                    callback_data=CatalogCategoryCallback(category_id=category["id"]).pack(),
+                )
+            ]
+        )
+
+    if parent_id is not None:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Back",
+                    callback_data=CatalogBackCallback(parent_id=parent_id).pack(),
+                )
+            ]
+        )
+
+    webapp_btn = _webapp_button(webapp_url)
+    if webapp_btn is not None:
+        rows.append([webapp_btn])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def catalog_products_keyboard(
+    *,
+    products: list[dict],
+    category_id: int,
+    page: int,
+    total_pages: int,
+    parent_id: int | None,
+    webapp_url: str,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for product in products:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=product["title"],
+                    callback_data=CatalogProductCallback(
+                        product_id=product["id"],
+                        category_id=category_id,
+                        page=page,
+                    ).pack(),
+                )
+            ]
+        )
+
+    pagination_row: list[InlineKeyboardButton] = []
+    if page > 1:
+        pagination_row.append(
+            InlineKeyboardButton(
+                text="Back",
+                callback_data=CatalogPageCallback(category_id=category_id, page=page - 1).pack(),
+            )
+        )
+    if page < total_pages:
+        pagination_row.append(
+            InlineKeyboardButton(
+                text="Forward",
+                callback_data=CatalogPageCallback(category_id=category_id, page=page + 1).pack(),
+            )
+        )
+    if pagination_row:
+        rows.append(pagination_row)
+
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="To categories",
+                callback_data=CatalogBackCallback(parent_id=parent_id or 0).pack(),
+            )
+        ]
+    )
+    webapp_btn = _webapp_button(webapp_url)
+    if webapp_btn is not None:
+        rows.append([webapp_btn])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def product_card_keyboard(*, product_id: int, category_id: int, page: int, webapp_url: str) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text="Add to cart", callback_data=CartAddCallback(product_id=product_id).pack())],
+        [
+            InlineKeyboardButton(
+                text="Back to products",
+                callback_data=CatalogPageCallback(category_id=category_id, page=page).pack(),
+            )
+        ],
+    ]
+    webapp_btn = _webapp_button(_build_product_url(webapp_url, product_id))
+    if webapp_btn is not None:
+        rows.append([webapp_btn])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)

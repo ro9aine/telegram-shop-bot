@@ -17,10 +17,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-from botconfig.views import register_profile_view, required_channels_view
+from botconfig.views import (
+    catalog_categories_view,
+    catalog_product_detail_view,
+    catalog_products_view,
+    register_profile_view,
+    required_channels_view,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('internal/required-channels/', required_channels_view),
     path('internal/register-profile/', register_profile_view),
+    path("api/catalog/categories/", catalog_categories_view),
+    path("api/catalog/products/", catalog_products_view),
+    path("api/catalog/products/<int:product_id>/", catalog_product_detail_view),
 ]
