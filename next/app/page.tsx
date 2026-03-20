@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Skeleton } from "antd";
 
 import { browserApi } from "../lib/http";
 
@@ -68,9 +69,11 @@ export default function HomePage() {
     pagination: { page: 1, total_pages: 1 },
   });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
+    setIsCatalogLoading(true);
     const params = new URLSearchParams();
     params.set("page", String(Number.isFinite(page) ? page : 1));
     params.set("page_size", "12");
@@ -113,6 +116,11 @@ export default function HomePage() {
           setProductsPayload({ items: [], pagination: { page: 1, total_pages: 1 } });
           setSelectedProduct(null);
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsCatalogLoading(false);
+        }
       });
 
     return () => controller.abort();
@@ -144,7 +152,17 @@ export default function HomePage() {
       </section>
 
       <section className="grid">
-        {selectedProduct ? (
+        {isCatalogLoading
+          ? Array.from({ length: 6 }).map((_, idx) => (
+              <article className="card" key={`skeleton-${idx}`}>
+                <Skeleton.Image active style={{ width: "100%", height: "auto", aspectRatio: "16 / 10" }} />
+                <div style={{ padding: "12px" }}>
+                  <Skeleton active paragraph={{ rows: 1 }} title={false} />
+                </div>
+              </article>
+            ))
+          : null}
+        {!isCatalogLoading && selectedProduct ? (
           <Link
             className="card card-selected card-clickable"
             href={`/product/${selectedProduct.id}`}
@@ -157,13 +175,14 @@ export default function HomePage() {
             <div className="price">{selectedProduct.price}</div>
           </Link>
         ) : null}
-        {productsPayload.items.map((item) => (
-          <Link className="card card-clickable" href={`/product/${item.id}`} key={item.id}>
-            {item.images[0] ? <img alt={item.title} className="card-image" src={item.images[0]} /> : null}
-            <h2 title={item.title}>{truncate(item.title, 90)}</h2>
-            <div className="price">{item.price}</div>
-          </Link>
-        ))}
+        {!isCatalogLoading &&
+          productsPayload.items.map((item) => (
+            <Link className="card card-clickable" href={`/product/${item.id}`} key={item.id}>
+              {item.images[0] ? <img alt={item.title} className="card-image" src={item.images[0]} /> : null}
+              <h2 title={item.title}>{truncate(item.title, 90)}</h2>
+              <div className="price">{item.price}</div>
+            </Link>
+          ))}
       </section>
 
       <nav className="pager">

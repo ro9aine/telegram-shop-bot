@@ -1,13 +1,7 @@
 import axios from "axios";
 
-export const djangoApi = axios.create({
-  baseURL: process.env.CATALOG_API_BASE_URL ?? "http://djg:8000",
-  timeout: 10000,
-  validateStatus: () => true,
-});
-
 export const browserApi = axios.create({
-  baseURL: "/api",
+  baseURL: process.env.NEXT_PUBLIC_CATALOG_API_BASE_URL ?? "http://localhost:8000/api",
   timeout: 10000,
   validateStatus: () => true,
 });
