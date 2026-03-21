@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Product, ProductImage, RequiredChannel, Subcategory, TelegramProfile
+from .models import BasketItem, Category, Order, OrderItem, Product, ProductImage, RequiredChannel, Subcategory, TelegramProfile
 
 
 @admin.register(RequiredChannel)
@@ -12,8 +12,8 @@ class RequiredChannelAdmin(admin.ModelAdmin):
 
 @admin.register(TelegramProfile)
 class TelegramProfileAdmin(admin.ModelAdmin):
-    list_display = ("telegram_user_id", "phone_number", "username", "first_name", "last_name", "updated_at")
-    search_fields = ("telegram_user_id", "phone_number", "username", "first_name", "last_name")
+    list_display = ("telegram_user_id", "phone_number", "username", "first_name", "last_name", "photo_url", "updated_at")
+    search_fields = ("telegram_user_id", "phone_number", "username", "first_name", "last_name", "photo_url")
 
 
 class ProductImageInline(admin.TabularInline):
@@ -41,3 +41,37 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "category", "subcategory")
     search_fields = ("title", "description", "source_article", "source_url")
     inlines = [ProductImageInline]
+
+
+@admin.register(BasketItem)
+class BasketItemAdmin(admin.ModelAdmin):
+    list_display = ("profile", "product", "quantity", "updated_at")
+    list_filter = ("updated_at",)
+    search_fields = (
+        "profile__telegram_user_id",
+        "profile__phone_number",
+        "product__title",
+        "product__source_article",
+    )
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    readonly_fields = ("product", "title", "price", "quantity", "created_at")
+    can_delete = False
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "profile", "recipient_name", "phone_number", "total_amount", "status", "created_at")
+    list_filter = ("status", "created_at")
+    search_fields = (
+        "id",
+        "profile__telegram_user_id",
+        "profile__phone_number",
+        "recipient_name",
+        "phone_number",
+        "delivery_address",
+    )
+    inlines = [OrderItemInline]

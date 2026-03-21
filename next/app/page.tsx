@@ -1,22 +1,17 @@
 "use client";
 
+import { Badge, Button } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Skeleton } from "antd";
 
+import { addToBasket, BasketItem, fetchBasket, removeFromBasket } from "../lib/basket";
 import { browserApi } from "../lib/http";
-
-type Category = {
-  id: number;
-  title: string;
-  parent_id: number | null;
-};
 
 type Product = {
   id: number;
   title: string;
-  description: string;
   price: string;
   images: string[];
 };
@@ -29,191 +24,162 @@ type ProductsPayload = {
   };
 };
 
-type ProductDetailPayload = {
-  item: Product | null;
-};
-
-function truncate(text: string, limit: number): string {
-  const normalized = text.trim();
-  if (normalized.length <= limit) {
-    return normalized;
-  }
-  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
-}
-
-function buildCatalogHref(page: number, categoryId: number | null): string {
-  const params = new URLSearchParams();
-  if (page > 1) {
-    params.set("page", String(page));
-  }
-  if (categoryId !== null) {
-    params.set("category", String(categoryId));
-  }
-  const query = params.toString();
-  return query ? `/?${query}` : "/";
-}
-
 export default function HomePage() {
-  const searchParams = useSearchParams();
-  const selectedCategoryIdRaw = searchParams.get("category");
-  const pageRaw = searchParams.get("page");
-  const selectedProductIdRaw = searchParams.get("product");
+  const router = useRouter();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [basketQuantities, setBasketQuantities] = useState<Record<number, number>>({});
+  const [basketLoadingById, setBasketLoadingById] = useState<Record<number, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [navigatingToId, setNavigatingToId] = useState<number | null>(null);
 
-  const selectedCategoryId = selectedCategoryIdRaw ? Number(selectedCategoryIdRaw) : null;
-  const page = pageRaw ? Math.max(1, Number(pageRaw)) : 1;
-  const selectedProductId = selectedProductIdRaw ? Number(selectedProductIdRaw) : null;
-
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [productsPayload, setProductsPayload] = useState<ProductsPayload>({
-    items: [],
-    pagination: { page: 1, total_pages: 1 },
-  });
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
+  const applyBasketItems = (items: BasketItem[]) => {
+    const next: Record<number, number> = {};
+    for (const item of items) {
+      next[item.productId] = item.quantity;
+    }
+    setBasketQuantities(next);
+  };
 
   useEffect(() => {
     const controller = new AbortController();
-    setIsCatalogLoading(true);
-    const params = new URLSearchParams();
-    params.set("page", String(Number.isFinite(page) ? page : 1));
-    params.set("page_size", "12");
-    if (selectedCategoryId !== null && Number.isFinite(selectedCategoryId)) {
-      params.set("category_id", String(selectedCategoryId));
-    }
+    setIsLoading(true);
 
-    const productIdForQuery =
-      selectedProductId !== null && Number.isFinite(selectedProductId) ? selectedProductId : null;
+    fetchBasket()
+      .then((items) => applyBasketItems(items))
+      .catch(() => applyBasketItems([]));
 
-    Promise.all([
-      browserApi.get<{ categories?: Category[] }>("/catalog/categories/", { signal: controller.signal }),
-      browserApi.get<ProductsPayload>(`/catalog/products/?${params.toString()}`, { signal: controller.signal }),
-      productIdForQuery
-        ? browserApi.get<ProductDetailPayload>(`/catalog/products/${productIdForQuery}/`, { signal: controller.signal })
-        : Promise.resolve(null),
-    ])
-      .then(([categoriesResponse, productsResponse, productResponse]) => {
-        if (categoriesResponse.status >= 200 && categoriesResponse.status < 300) {
-          setCategories(categoriesResponse.data.categories ?? []);
+    browserApi
+      .get<ProductsPayload>("/catalog/products/?page=1&page_size=12", {
+        signal: controller.signal,
+      })
+      .then((response) => {
+        if (response.status >= 200 && response.status < 300) {
+          setProducts(response.data.items ?? []);
         } else {
-          setCategories([]);
-        }
-
-        if (productsResponse.status >= 200 && productsResponse.status < 300) {
-          setProductsPayload(productsResponse.data);
-        } else {
-          setProductsPayload({ items: [], pagination: { page: 1, total_pages: 1 } });
-        }
-
-        if (productResponse && productResponse.status >= 200 && productResponse.status < 300) {
-          setSelectedProduct(productResponse.data.item ?? null);
-        } else {
-          setSelectedProduct(null);
+          setProducts([]);
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setCategories([]);
-          setProductsPayload({ items: [], pagination: { page: 1, total_pages: 1 } });
-          setSelectedProduct(null);
+          setProducts([]);
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) {
-          setIsCatalogLoading(false);
+          setIsLoading(false);
         }
       });
 
     return () => controller.abort();
-  }, [page, selectedCategoryId, selectedProductId]);
+  }, []);
 
-  const currentPage = productsPayload.pagination.page || 1;
-  const totalPages = productsPayload.pagination.total_pages || 1;
+  useEffect(() => {
+    const sync = async () => applyBasketItems(await fetchBasket());
+    const onBasketChanged = (event: Event) => {
+      const custom = event as CustomEvent<BasketItem[]>;
+      if (Array.isArray(custom.detail)) {
+        applyBasketItems(custom.detail);
+        return;
+      }
+      void sync();
+    };
+
+    window.addEventListener("basket:changed", onBasketChanged);
+    return () => window.removeEventListener("basket:changed", onBasketChanged);
+  }, []);
 
   return (
     <main className="page">
       <header className="hero">
         <h1>Catalog</h1>
-        <p>Shop items are synced from Django API.</p>
       </header>
 
-      <section className="filters">
-        <Link className={!selectedCategoryId ? "chip chip-active" : "chip"} href="/">
-          All
-        </Link>
-        {categories.map((category) => (
-          <Link
-            className={selectedCategoryId === category.id ? "chip chip-active" : "chip"}
-            href={`/?category=${category.id}`}
-            key={category.id}
-          >
-            {category.title}
-          </Link>
-        ))}
-      </section>
-
       <section className="grid">
-        {isCatalogLoading
-          ? Array.from({ length: 6 }).map((_, idx) => (
-              <article className="card" key={`skeleton-${idx}`}>
-                <Skeleton.Image active style={{ width: "100%", height: "auto", aspectRatio: "16 / 10" }} />
-                <div style={{ padding: "12px" }}>
-                  <Skeleton active paragraph={{ rows: 1 }} title={false} />
+        {isLoading
+          ? Array.from({ length: 12 }).map((_, idx) => (
+              <article
+                className="card catalog-skeleton-card"
+                key={`skeleton-${idx}`}
+              >
+                <div className="catalog-skeleton-image" />
+                <div className="catalog-skeleton-content">
+                  <div className="catalog-skeleton-line catalog-skeleton-line-title" />
+                  <div className="catalog-skeleton-line catalog-skeleton-line-price" />
                 </div>
               </article>
             ))
-          : null}
-        {!isCatalogLoading && selectedProduct ? (
-          <Link
-            className="card card-selected card-clickable"
-            href={`/product/${selectedProduct.id}`}
-            key={`selected-${selectedProduct.id}`}
-          >
-            {selectedProduct.images[0] ? (
-              <img alt={selectedProduct.title} className="card-image" src={selectedProduct.images[0]} />
-            ) : null}
-            <h2>{selectedProduct.title}</h2>
-            <div className="price">{selectedProduct.price}</div>
-          </Link>
-        ) : null}
-        {!isCatalogLoading &&
-          productsPayload.items.map((item) => (
-            <Link className="card card-clickable" href={`/product/${item.id}`} key={item.id}>
-              {item.images[0] ? <img alt={item.title} className="card-image" src={item.images[0]} /> : null}
-              <h2 title={item.title}>{truncate(item.title, 90)}</h2>
-              <div className="price">{item.price}</div>
-            </Link>
-          ))}
+          : products.map((item) => {
+              const isNavigating = navigatingToId === item.id;
+              const quantityInBasket = basketQuantities[item.id] ?? 0;
+              const isBasketUpdating = basketLoadingById[item.id] === true;
+              return (
+                <article className="card" key={item.id}>
+                  <Link
+                    className={
+                      isNavigating
+                        ? "card-clickable card-loading"
+                        : "card-clickable"
+                    }
+                    href={`/product/${item.id}`}
+                    onClick={() => setNavigatingToId(item.id)}
+                    onMouseEnter={() => router.prefetch(`/product/${item.id}`)}
+                    prefetch
+                  >
+                    {item.images[0] ? (
+                      <img
+                        alt={item.title}
+                        className="card-image"
+                        src={item.images[0]}
+                      />
+                    ) : null}
+                    <h2 title={item.title}>{item.title}</h2>
+                    {isNavigating ? (
+                      <div className="card-loading-overlay" aria-hidden="true" />
+                    ) : null}
+                  </Link>
+                  <div className="catalog-card-footer">
+                    <div className="catalog-price-inline">{item.price}</div>
+                    <Badge count={quantityInBasket > 0 ? 1 : 0} size="small">
+                      <Button
+                        aria-label={
+                          quantityInBasket > 0
+                            ? `Remove ${item.title} from basket`
+                            : `Add ${item.title} to basket`
+                        }
+                        className="catalog-add-btn"
+                        onClick={async () => {
+                          if (isBasketUpdating) {
+                            return;
+                          }
+                          setBasketLoadingById((prev) => ({ ...prev, [item.id]: true }));
+                          try {
+                            if (quantityInBasket > 0) {
+                              applyBasketItems(await removeFromBasket(item.id));
+                              return;
+                            }
+                            applyBasketItems(
+                              await addToBasket({
+                                productId: item.id,
+                                title: item.title,
+                                price: item.price,
+                                image: item.images[0] ?? null,
+                              }),
+                            );
+                          } finally {
+                            setBasketLoadingById((prev) => ({ ...prev, [item.id]: false }));
+                          }
+                        }}
+                        loading={isBasketUpdating}
+                        size="small"
+                        type={quantityInBasket > 0 ? "default" : "primary"}
+                        icon={<DeleteOutlined />}
+                      />
+                    </Badge>
+                  </div>
+                </article>
+              );
+            })}
       </section>
-
-      <nav className="pager">
-        {currentPage > 1 ? (
-          <Link
-            href={buildCatalogHref(
-              currentPage - 1,
-              Number.isFinite(selectedCategoryId ?? Number.NaN) ? selectedCategoryId : null,
-            )}
-          >
-            Back
-          </Link>
-        ) : (
-          <span />
-        )}
-        <span>
-          Page {currentPage}/{totalPages}
-        </span>
-        {currentPage < totalPages ? (
-          <Link
-            href={buildCatalogHref(
-              currentPage + 1,
-              Number.isFinite(selectedCategoryId ?? Number.NaN) ? selectedCategoryId : null,
-            )}
-          >
-            Forward
-          </Link>
-        ) : (
-          <span />
-        )}
-      </nav>
     </main>
   );
 }

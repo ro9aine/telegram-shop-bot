@@ -22,6 +22,7 @@ class TelegramProfile(models.Model):
     username = models.CharField(max_length=255, blank=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
+    photo_url = models.URLField(blank=True)
     phone_number = models.CharField(max_length=32)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -104,3 +105,66 @@ class ProductImage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_id}: {self.image_url}"
+
+
+class BasketItem(models.Model):
+    profile = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="basket_items")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="basket_items")
+    quantity = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        unique_together = ("profile", "product")
+        verbose_name = "Basket item"
+        verbose_name_plural = "Basket items"
+
+    def __str__(self) -> str:
+        return f"{self.profile.telegram_user_id} -> {self.product_id} x{self.quantity}"
+
+
+class Order(models.Model):
+    STATUS_NEW = "new"
+    STATUS_PROCESSING = "processing"
+    STATUS_DONE = "done"
+    STATUS_CHOICES = [
+        (STATUS_NEW, "New"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_DONE, "Done"),
+    ]
+
+    profile = models.ForeignKey(TelegramProfile, on_delete=models.PROTECT, related_name="orders")
+    recipient_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=32)
+    delivery_address = models.TextField()
+    delivery_comment = models.TextField(blank=True)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_NEW)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Order"
+        verbose_name_plural = "Orders"
+
+    def __str__(self) -> str:
+        return f"Order #{self.id} ({self.profile.telegram_user_id})"
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="order_items")
+    title = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Order item"
+        verbose_name_plural = "Order items"
+
+    def __str__(self) -> str:
+        return f"Order #{self.order_id}: {self.product_id} x{self.quantity}"

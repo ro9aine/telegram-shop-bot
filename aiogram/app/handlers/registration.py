@@ -91,6 +91,7 @@ async def handle_contact(message: Message) -> None:
         username=message.from_user.username if message.from_user else "",
         first_name=message.from_user.first_name if message.from_user else "",
         last_name=message.from_user.last_name if message.from_user else "",
+        photo_url=getattr(message.from_user, "photo_url", "") if message.from_user else "",
     )
     logger.info("Saved phone for user_id=%s", user_id)
     if not sync_ok:

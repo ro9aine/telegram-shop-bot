@@ -1,12 +1,13 @@
 import json
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
-from django.db import ProgrammingError
+from django.db import ProgrammingError, transaction
 from django.http import HttpRequest, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotFound, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 
-from .models import Category, Product, RequiredChannel, Subcategory, TelegramProfile
+from .models import BasketItem, Category, Order, OrderItem, Product, RequiredChannel, Subcategory, TelegramProfile
 
 
 def _is_internal_request(request: HttpRequest) -> bool:
@@ -58,6 +59,55 @@ def _product_payload(product: Product) -> dict[str, int | str | list[str]]:
         "price": str(product.price),
         "images": [image.image_url for image in product.images.all()],
     }
+
+
+def _resolve_profile(request: HttpRequest) -> TelegramProfile | None:
+    raw = request.headers.get("X-Telegram-User-Id", "").strip()
+    if not raw:
+        return None
+    try:
+        user_id = int(raw)
+    except ValueError:
+        return None
+    return TelegramProfile.objects.filter(telegram_user_id=user_id).first()
+
+
+def _basket_item_payload(item: BasketItem) -> dict[str, int | str | None]:
+    image = item.product.images.first()
+    return {
+        "product_id": item.product_id,
+        "title": item.product.title,
+        "price": str(item.product.price),
+        "image": image.image_url if image else None,
+        "quantity": item.quantity,
+    }
+
+
+def _basket_payload(profile: TelegramProfile) -> dict[str, object]:
+    items = list(
+        BasketItem.objects.filter(profile=profile)
+        .select_related("product")
+        .prefetch_related("product__images")
+    )
+    return {"items": [_basket_item_payload(item) for item in items]}
+
+
+def _profile_payload(profile: TelegramProfile) -> dict[str, int | str]:
+    return {
+        "telegram_user_id": profile.telegram_user_id,
+        "username": profile.username,
+        "first_name": profile.first_name,
+        "last_name": profile.last_name,
+        "photo_url": profile.photo_url,
+        "phone_number": profile.phone_number,
+    }
+
+
+def _basket_total(items: list[BasketItem]) -> Decimal:
+    total = Decimal("0")
+    for item in items:
+        total += item.product.price * item.quantity
+    return total
 
 
 @require_GET
@@ -132,6 +182,166 @@ def catalog_product_detail_view(request: HttpRequest, product_id: int) -> JsonRe
     return JsonResponse({"item": _product_payload(product)})
 
 
+@require_GET
+def basket_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+    return JsonResponse(_basket_payload(profile))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def basket_add_item_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden | HttpResponseBadRequest:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+        product_id = int(payload["product_id"])
+        quantity = max(1, int(payload.get("quantity", 1)))
+    except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+        return HttpResponseBadRequest("Invalid payload")
+
+    product = Product.objects.filter(id=product_id, is_active=True).first()
+    if product is None:
+        return HttpResponseBadRequest("Product not found")
+
+    item, created = BasketItem.objects.get_or_create(profile=profile, product=product, defaults={"quantity": quantity})
+    if not created:
+        item.quantity += quantity
+        item.save(update_fields=["quantity", "updated_at"])
+
+    return JsonResponse(_basket_payload(profile))
+
+
+@csrf_exempt
+@require_http_methods(["PATCH", "DELETE"])
+def basket_item_view(
+    request: HttpRequest,
+    product_id: int,
+) -> JsonResponse | HttpResponseForbidden | HttpResponseBadRequest:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+
+    item = BasketItem.objects.filter(profile=profile, product_id=product_id).first()
+    if request.method == "DELETE":
+        if item:
+            item.delete()
+        return JsonResponse(_basket_payload(profile))
+
+    if item is None:
+        return HttpResponseBadRequest("Basket item not found")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+        quantity = int(payload["quantity"])
+    except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+        return HttpResponseBadRequest("Invalid payload")
+
+    if quantity <= 0:
+        item.delete()
+    else:
+        item.quantity = quantity
+        item.save(update_fields=["quantity", "updated_at"])
+
+    return JsonResponse(_basket_payload(profile))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def basket_clear_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+    BasketItem.objects.filter(profile=profile).delete()
+    return JsonResponse({"items": []})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def checkout_order_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden | HttpResponseBadRequest:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Invalid payload")
+
+    recipient_name = str(payload.get("recipient_name") or "").strip()
+    phone_number = str(payload.get("phone_number") or "").strip()
+    delivery_address = str(payload.get("delivery_address") or "").strip()
+    delivery_comment = str(payload.get("delivery_comment") or "").strip()
+
+    if not recipient_name:
+        return HttpResponseBadRequest("recipient_name is required")
+    if not phone_number:
+        return HttpResponseBadRequest("phone_number is required")
+    if not delivery_address:
+        return HttpResponseBadRequest("delivery_address is required")
+
+    basket_items = list(
+        BasketItem.objects.filter(profile=profile)
+        .select_related("product")
+        .prefetch_related("product__images")
+    )
+    if not basket_items:
+        return HttpResponseBadRequest("Basket is empty")
+
+    try:
+        total_amount = _basket_total(basket_items)
+    except InvalidOperation:
+        return HttpResponseBadRequest("Unable to calculate basket total")
+
+    with transaction.atomic():
+        order = Order.objects.create(
+            profile=profile,
+            recipient_name=recipient_name,
+            phone_number=phone_number,
+            delivery_address=delivery_address,
+            delivery_comment=delivery_comment,
+            total_amount=total_amount,
+        )
+
+        OrderItem.objects.bulk_create(
+            [
+                OrderItem(
+                    order=order,
+                    product=item.product,
+                    title=item.product.title,
+                    price=item.product.price,
+                    quantity=item.quantity,
+                )
+                for item in basket_items
+            ]
+        )
+
+        BasketItem.objects.filter(profile=profile).delete()
+
+    return JsonResponse(
+        {
+            "order": {
+                "id": order.id,
+                "status": order.status,
+                "total_amount": str(order.total_amount),
+                "items_count": len(basket_items),
+            }
+        }
+    )
+
+
+@require_GET
+def profile_me_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden:
+    profile = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden("Telegram profile not found. Register in bot first.")
+    return JsonResponse({"profile": _profile_payload(profile)})
+
+
 @csrf_exempt
 def register_profile_view(
     request: HttpRequest,
@@ -155,6 +365,7 @@ def register_profile_view(
             "username": str(payload.get("username") or ""),
             "first_name": str(payload.get("first_name") or ""),
             "last_name": str(payload.get("last_name") or ""),
+            "photo_url": str(payload.get("photo_url") or ""),
             "phone_number": phone_number,
         },
     )

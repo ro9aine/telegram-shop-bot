@@ -41,6 +41,7 @@ def sync_profile(
     username: str,
     first_name: str,
     last_name: str,
+    photo_url: str = "",
 ) -> bool:
     payload = json.dumps(
         {
@@ -49,6 +50,7 @@ def sync_profile(
             "username": username,
             "first_name": first_name,
             "last_name": last_name,
+            "photo_url": photo_url,
         }
     ).encode("utf-8")
     request = Request(

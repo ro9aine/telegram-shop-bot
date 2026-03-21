@@ -12,7 +12,7 @@ function itemClass(pathname: string, href: string): string {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [activePath, setActivePath] = useState(pathname);
+  const [activePath, setActivePath] = useState("");
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
 
   useEffect(() => {

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { browserApi } from "../../../lib/http";
 import ProductDetailClient from "./product-detail-client";
+import ProductLoadingSkeleton from "./product-loading-skeleton";
 
 type Product = {
   id: number;
@@ -70,11 +71,7 @@ export default function ProductPage() {
   }
 
   if (!product) {
-    return (
-      <main className="page">
-        <p>Loading...</p>
-      </main>
-    );
+    return <ProductLoadingSkeleton />;
   }
 
   return <ProductDetailClient product={product} />;
