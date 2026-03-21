@@ -38,25 +38,25 @@ def _extract_start_product_id(text: str | None) -> int | None:
 @router.message(CommandStart())
 async def handle_start(message: Message) -> None:
     logger.info("Handled /start for chat_id=%s", message.chat.id)
+    user_id = message.from_user.id if message.from_user else None
+    if user_id is None:
+        await message.answer("Cannot identify user.")
+        return
+
+    if not get_profile(user_id):
+        await message.answer(
+            "Please share your phone number to complete registration.",
+            reply_markup=contact_request_keyboard(),
+        )
+        return
+
     product_id = _extract_start_product_id(message.text)
     if product_id is not None:
         shown = await show_product_from_start(message, product_id)
         if shown:
             return
 
-    user_id = message.from_user.id if message.from_user else None
-    if user_id is None:
-        await message.answer("Cannot identify user.")
-        return
-
-    if get_profile(user_id):
-        await message.answer("You are already registered.", reply_markup=ReplyKeyboardRemove())
-        return
-
-    await message.answer(
-        "Please share your phone number to complete registration.",
-        reply_markup=contact_request_keyboard(),
-    )
+    await message.answer("You are already registered.", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(F.contact)

@@ -4,7 +4,23 @@ declare global {
       WebApp?: {
         onEvent?: (eventType: string, eventHandler: () => void) => void;
         offEvent?: (eventType: string, eventHandler: () => void) => void;
+        ready?: () => void;
+        expand?: () => void;
+        openTelegramLink?: (url: string) => void;
         showAlert?: (message: string) => void;
+        colorScheme?: "light" | "dark";
+        themeParams?: {
+          bg_color?: string;
+          secondary_bg_color?: string;
+          text_color?: string;
+          hint_color?: string;
+          button_color?: string;
+          button_text_color?: string;
+        };
+        BackButton?: {
+          show: () => void;
+          hide: () => void;
+        };
         MainButton?: {
           show: () => void;
           hide: () => void;
@@ -23,6 +39,7 @@ declare global {
             photo_url?: string;
           };
         };
+        initData?: string;
       };
     };
   }
@@ -30,6 +47,7 @@ declare global {
 
 const TELEGRAM_USER_ID_CACHE_KEY = "shop:telegram_user_id";
 const TELEGRAM_USER_CACHE_KEY = "shop:telegram_user";
+const TELEGRAM_INIT_DATA_CACHE_KEY = "shop:telegram_init_data";
 
 function fromSearchParams(): number | null {
   if (typeof window === "undefined") {
@@ -161,6 +179,50 @@ export function getTelegramUserId(): number | null {
   }
 
   return fromCache();
+}
+
+function fromInitDataCache(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.localStorage.getItem(TELEGRAM_INIT_DATA_CACHE_KEY) || "";
+}
+
+export function getTelegramInitData(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  const initData = (window.Telegram?.WebApp?.initData || "").trim();
+  if (initData) {
+    window.localStorage.setItem(TELEGRAM_INIT_DATA_CACHE_KEY, initData);
+    return initData;
+  }
+  return fromInitDataCache();
+}
+
+export async function waitForTelegramInitData(
+  attempts = 8,
+  intervalMs = 120,
+): Promise<string> {
+  const immediate = getTelegramInitData();
+  if (immediate) {
+    return immediate;
+  }
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return new Promise((resolve) => {
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      tries += 1;
+      const value = getTelegramInitData();
+      if (value || tries >= attempts) {
+        window.clearInterval(timer);
+        resolve(value || "");
+      }
+    }, intervalMs);
+  });
 }
 
 export async function waitForTelegramUserId(

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { Button } from "antd";
@@ -13,6 +13,7 @@ import {
   removeFromBasket,
   updateBasketQuantity,
 } from "../../lib/basket";
+import { useTelegramMainButton } from "../../lib/use-telegram-buttons";
 
 export default function BasketPage() {
   const router = useRouter();
@@ -37,39 +38,16 @@ export default function BasketPage() {
 
   const total = useMemo(() => basketTotal(items), [items]);
 
-  useEffect(() => {
-    const webApp = window.Telegram?.WebApp;
-    const mainButton = webApp?.MainButton;
-    if (!webApp || !mainButton) {
-      return;
-    }
-
-    const onMainButtonClick = () => {
+  useTelegramMainButton({
+    text: `Proceed to checkout ${total.toFixed(2)}`,
+    enabled: items.length > 0,
+    visible: items.length > 0,
+    onClick: () => {
       if (items.length > 0) {
         router.push("/checkout");
       }
-    };
-
-    webApp.onEvent?.("mainButtonClicked", onMainButtonClick);
-    return () => webApp.offEvent?.("mainButtonClicked", onMainButtonClick);
-  }, [items.length, router]);
-
-  useEffect(() => {
-    const mainButton = window.Telegram?.WebApp?.MainButton;
-    if (!mainButton) {
-      return;
-    }
-
-    if (!items.length) {
-      mainButton.hide();
-      return;
-    }
-
-    mainButton.setText(`К оформлению ${total.toFixed(2)}`);
-    mainButton.show();
-    mainButton.enable();
-    return () => mainButton.hide();
-  }, [items.length, total]);
+    },
+  });
 
   return (
     <main className="page">
@@ -141,3 +119,4 @@ export default function BasketPage() {
     </main>
   );
 }
+

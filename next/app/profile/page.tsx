@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { browserApi } from "../../lib/http";
@@ -16,26 +17,46 @@ type ProfilePayload = {
   };
 };
 
+type OrdersPayload = {
+  orders?: Array<{
+    id: number;
+    status: string;
+    payment_status: string;
+    total_amount: string;
+    items_count: number;
+    created_at: string;
+  }>;
+};
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfilePayload["profile"] | null>(null);
+  const [orders, setOrders] = useState<OrdersPayload["orders"]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
 
-    browserApi
-      .get<ProfilePayload>("/profile/me/", { signal: controller.signal })
-      .then((response) => {
-        if (response.status >= 200 && response.status < 300) {
-          setProfile(response.data.profile ?? null);
+    Promise.all([
+      browserApi.get<ProfilePayload>("/profile/me/", { signal: controller.signal }),
+      browserApi.get<OrdersPayload>("/orders/", { signal: controller.signal }),
+    ])
+      .then(([profileResponse, ordersResponse]) => {
+        if (profileResponse.status >= 200 && profileResponse.status < 300) {
+          setProfile(profileResponse.data.profile ?? null);
         } else {
           setProfile(null);
+        }
+        if (ordersResponse.status >= 200 && ordersResponse.status < 300) {
+          setOrders(ordersResponse.data.orders ?? []);
+        } else {
+          setOrders([]);
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setProfile(null);
+          setOrders([]);
         }
       })
       .finally(() => {
@@ -75,6 +96,26 @@ export default function ProfilePage() {
             ))}
           </div>
         </section>
+
+        <section className="profile-orders">
+          <h2>Orders</h2>
+          <div className="profile-orders-list">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <article className="profile-order-item" key={`order-skeleton-${idx}`}>
+                <div className="profile-order-top">
+                  <div className="catalog-skeleton-line profile-order-skeleton-id" />
+                  <div className="catalog-skeleton-line profile-order-skeleton-date" />
+                </div>
+                <div className="profile-order-meta">
+                  <div className="catalog-skeleton-line profile-order-skeleton-chip" />
+                  <div className="catalog-skeleton-line profile-order-skeleton-chip" />
+                  <div className="catalog-skeleton-line profile-order-skeleton-chip" />
+                  <div className="catalog-skeleton-line profile-order-skeleton-chip" />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </main>
     );
   }
@@ -109,6 +150,37 @@ export default function ProfilePage() {
             <span className="profile-value">{profile?.username ? `@${profile.username}` : telegramUser?.username ? `@${telegramUser.username}` : "-"}</span>
           </div>
         </div>
+      </section>
+
+      <section className="profile-orders">
+        <h2>Orders</h2>
+        {!orders?.length ? (
+          <p className="profile-orders-empty">No orders yet.</p>
+        ) : (
+          <div className="profile-orders-list">
+            {orders.map((order) => (
+              <article className="profile-order-item" key={order.id}>
+                <div className="profile-order-top">
+                  <span className="profile-order-id">#{order.id}</span>
+                  <span className="profile-order-date">{new Date(order.created_at).toLocaleString()}</span>
+                </div>
+                <div className="profile-order-meta">
+                  <span>Status: {order.status}</span>
+                  <span>Payment: {order.payment_status}</span>
+                  <span>Items: {order.items_count}</span>
+                  <span>Total: {order.total_amount}</span>
+                </div>
+                {order.payment_status !== "paid" ? (
+                  <div className="profile-order-actions">
+                    <Link className="chip chip-active" href={`/payment?orderId=${order.id}`}>
+                      Pay order
+                    </Link>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

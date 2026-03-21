@@ -13,12 +13,12 @@ from app.callbacks import (
     CatalogCategoryCallback,
     CatalogPageCallback,
     CatalogProductCallback,
-    CartAddCallback,
 )
 from app.config import get_settings
+from app.keyboards import contact_request_keyboard
 from app.keyboards import catalog_categories_keyboard, catalog_products_keyboard, product_card_keyboard
-from app.storage.cart import add_to_cart
 from app.storage.catalog import load_categories, load_product, load_products
+from app.storage.profiles import get_profile
 
 router = Router()
 
@@ -28,6 +28,36 @@ IMAGE_FETCH_TIMEOUT_SECONDS = 6
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_ALBUM_IMAGES = 10
 _PRODUCT_TEMP_MESSAGES: dict[tuple[int, int], list[int]] = {}
+
+
+async def _ensure_registered_for_message(message: Message) -> bool:
+    user_id = message.from_user.id if message.from_user else None
+    if user_id is None:
+        await message.answer("Cannot identify user.")
+        return False
+    if get_profile(user_id):
+        return True
+    await message.answer(
+        "Please register first. Share your phone number to continue.",
+        reply_markup=contact_request_keyboard(),
+    )
+    return False
+
+
+async def _ensure_registered_for_callback(callback: CallbackQuery) -> bool:
+    user_id = callback.from_user.id if callback.from_user else None
+    if user_id is None:
+        await callback.answer("Cannot identify user", show_alert=True)
+        return False
+    if get_profile(user_id):
+        return True
+    if callback.message is not None:
+        await callback.message.answer(
+            "Please register first. Share your phone number to continue.",
+            reply_markup=contact_request_keyboard(),
+        )
+    await callback.answer("Registration required", show_alert=True)
+    return False
 
 
 def _trim_text(value: str, limit: int) -> str:
@@ -227,11 +257,15 @@ async def _show_products(callback: CallbackQuery, category_id: int, page: int) -
 
 @router.message(Command("catalog"))
 async def handle_catalog(message: Message) -> None:
+    if not await _ensure_registered_for_message(message):
+        return
     await _show_categories(message, parent_id=None)
 
 
 @router.callback_query(CatalogBackCallback.filter())
 async def handle_catalog_back(callback: CallbackQuery, callback_data: CatalogBackCallback) -> None:
+    if not await _ensure_registered_for_callback(callback):
+        return
     await _cleanup_product_album_messages(callback)
     await _show_categories(callback, parent_id=callback_data.parent_id or None)
     await callback.answer()
@@ -239,6 +273,8 @@ async def handle_catalog_back(callback: CallbackQuery, callback_data: CatalogBac
 
 @router.callback_query(CatalogCategoryCallback.filter())
 async def handle_catalog_category(callback: CallbackQuery, callback_data: CatalogCategoryCallback) -> None:
+    if not await _ensure_registered_for_callback(callback):
+        return
     await _cleanup_product_album_messages(callback)
     settings = get_settings()
     categories = await load_categories(settings.django_api_base_url)
@@ -265,6 +301,8 @@ async def handle_catalog_category(callback: CallbackQuery, callback_data: Catalo
 
 @router.callback_query(CatalogPageCallback.filter())
 async def handle_catalog_page(callback: CallbackQuery, callback_data: CatalogPageCallback) -> None:
+    if not await _ensure_registered_for_callback(callback):
+        return
     await _cleanup_product_album_messages(callback)
     await _show_products(callback, category_id=callback_data.category_id, page=callback_data.page)
     await callback.answer()
@@ -272,6 +310,8 @@ async def handle_catalog_page(callback: CallbackQuery, callback_data: CatalogPag
 
 @router.callback_query(CatalogProductCallback.filter())
 async def handle_catalog_product(callback: CallbackQuery, callback_data: CatalogProductCallback) -> None:
+    if not await _ensure_registered_for_callback(callback):
+        return
     await _cleanup_product_album_messages(callback)
     settings = get_settings()
     product = await load_product(settings.django_api_base_url, callback_data.product_id)
@@ -341,8 +381,3 @@ async def show_product_from_start(message: Message, product_id: int) -> bool:
     )
 
 
-@router.callback_query(CartAddCallback.filter())
-async def handle_cart_add(callback: CallbackQuery, callback_data: CartAddCallback) -> None:
-    user_id = callback.from_user.id
-    quantity = add_to_cart(user_id=user_id, product_id=callback_data.product_id, quantity=1)
-    await callback.answer(f"Added. Quantity: {quantity}")

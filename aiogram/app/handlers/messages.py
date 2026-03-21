@@ -74,6 +74,18 @@ async def handle_check_subs(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
+@router.message(Command("help"))
+async def handle_help(message: Message) -> None:
+    await message.answer(
+        "Available commands:\n"
+        "/start - registration\n"
+        "/catalog - product catalog\n"
+        "/cart - open cart\n"
+        "/help - help\n"
+        "/admin_orders - active orders (admins only)"
+    )
+
+
 @router.message()
 async def handle_message(message: Message) -> None:
     logger.info(

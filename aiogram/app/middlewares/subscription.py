@@ -5,7 +5,7 @@ from aiogram import Bot
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramAPIError
-from aiogram.types import CallbackQuery, Message, TelegramObject
+from aiogram.types import CallbackQuery, InlineQuery, Message, TelegramObject
 
 from app.config import get_settings
 from app.keyboards import subscription_prompt
@@ -37,7 +37,6 @@ class SubscriptionRequiredMiddleware(BaseMiddleware):
             internal_api_token=internal_api_token,
             cache_ttl=settings.required_channels_cache_ttl,
         )
-        print('channesl', channels)
         if channels is None:
             text = "Subscription check is temporarily unavailable. Try again in a moment."
             if isinstance(event, Message):
@@ -45,6 +44,8 @@ class SubscriptionRequiredMiddleware(BaseMiddleware):
             elif isinstance(event, CallbackQuery) and event.message is not None:
                 await event.message.answer(text)
                 await event.answer()
+            elif isinstance(event, InlineQuery):
+                await event.answer(results=[], cache_time=2, is_personal=True)
             return None
 
         if not channels:
@@ -85,5 +86,13 @@ class SubscriptionRequiredMiddleware(BaseMiddleware):
         elif isinstance(event, CallbackQuery) and event.message is not None:
             await event.message.answer(text, reply_markup=reply_markup)
             await event.answer()
+        elif isinstance(event, InlineQuery):
+            await event.answer(
+                results=[],
+                cache_time=2,
+                is_personal=True,
+                switch_pm_text="Subscription required",
+                switch_pm_parameter="start",
+            )
 
         return None

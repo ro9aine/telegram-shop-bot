@@ -14,7 +14,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: "Segoe UI", Tahoma, sans-serif;
-  background: radial-gradient(circle at 10% 10%, #fffdf7, var(--bg));
+  background: radial-gradient(circle at 10% 10%, var(--paper), var(--bg));
   color: var(--text);
   overflow-y: scroll;
 }
@@ -310,38 +310,6 @@ html {
   background: #f1efe9;
 }
 
-.product-back-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.product-back-btn {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  padding: 0 !important;
-  line-height: 1 !important;
-  aspect-ratio: 1 / 1;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-color: rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(2px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.product-back-btn .anticon {
-  font-size: 16px;
-}
-
 .product-slide {
   width: 100%;
 }
@@ -619,6 +587,82 @@ html {
 .profile-value {
   font-size: 16px;
   font-weight: 600;
+}
+
+.profile-orders {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  padding: 16px;
+}
+
+.profile-orders h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.profile-orders-empty {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.profile-orders-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.profile-order-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.profile-order-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-order-id {
+  font-weight: 700;
+}
+
+.profile-order-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.profile-order-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.profile-order-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.profile-order-skeleton-id {
+  width: 56px;
+  height: 16px;
+}
+
+.profile-order-skeleton-date {
+  width: 140px;
+  height: 12px;
+}
+
+.profile-order-skeleton-chip {
+  width: 96px;
+  height: 14px;
 }
 
 .bottom-nav {

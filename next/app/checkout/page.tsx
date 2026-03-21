@@ -1,11 +1,24 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { Button } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { BasketItem, basketTotal, checkoutBasket, fetchBasket } from "../../lib/basket";
+import { browserApi } from "../../lib/http";
+import { useTelegramBackButton, useTelegramMainButton } from "../../lib/use-telegram-buttons";
+import { useTelegramWebAppUser } from "../../lib/use-telegram-webapp-user";
+
+type ProfilePayload = {
+  profile?: {
+    telegram_user_id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+    photo_url: string;
+    phone_number: string;
+  };
+};
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -15,11 +28,60 @@ export default function CheckoutPage() {
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryComment, setDeliveryComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [profile, setProfile] = useState<ProfilePayload["profile"] | null>(null);
+  const telegramUser = useTelegramWebAppUser();
 
   useEffect(() => {
     const sync = async () => setItems(await fetchBasket());
     void sync();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    browserApi
+      .get<ProfilePayload>("/profile/me/", { signal: controller.signal })
+      .then((response) => {
+        if (response.status >= 200 && response.status < 300) {
+          setProfile(response.data.profile ?? null);
+        } else {
+          setProfile(null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setProfile(null);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!recipientName.trim()) {
+      const first = profile?.first_name || telegramUser?.firstName || "";
+      const last = profile?.last_name || telegramUser?.lastName || "";
+      const fullName = `${first} ${last}`.trim();
+      if (fullName) {
+        setRecipientName(fullName);
+      }
+    }
+
+    if (!phoneNumber.trim()) {
+      const nextPhone = (profile?.phone_number || "").trim();
+      if (nextPhone) {
+        setPhoneNumber(nextPhone);
+      }
+    }
+  }, [
+    phoneNumber,
+    profile?.first_name,
+    profile?.last_name,
+    profile?.phone_number,
+    recipientName,
+    telegramUser?.firstName,
+    telegramUser?.lastName,
+  ]);
 
   const total = useMemo(() => basketTotal(items), [items]);
   const canCheckout =
@@ -34,10 +96,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    const webApp = window.Telegram?.WebApp;
-    const mainButton = webApp?.MainButton;
     setSubmitting(true);
-    mainButton?.showProgress(true);
 
     try {
       const order = await checkoutBasket({
@@ -48,48 +107,27 @@ export default function CheckoutPage() {
       });
 
       if (!order) {
-        webApp?.showAlert?.("Unable to create order. Please try again.");
+        window.Telegram?.WebApp?.showAlert?.("Unable to create order. Please try again.");
         return;
       }
 
-      webApp?.showAlert?.(`Order #${order.id} created successfully.`);
-      router.push("/basket");
+      window.Telegram?.WebApp?.showAlert?.(`Order #${order.id} created successfully.`);
+      router.push(`/payment?orderId=${order.id}`);
     } finally {
-      mainButton?.hideProgress();
       setSubmitting(false);
     }
   }, [canCheckout, deliveryAddress, deliveryComment, phoneNumber, recipientName, router]);
 
-  useEffect(() => {
-    const webApp = window.Telegram?.WebApp;
-    const mainButton = webApp?.MainButton;
-    if (!webApp || !mainButton) {
-      return;
-    }
-
-    const onMainButtonClick = () => {
+  useTelegramBackButton(() => router.push("/basket"), true);
+  useTelegramMainButton({
+    text: submitting ? "Submitting..." : "Confirm order",
+    enabled: canCheckout,
+    loading: submitting,
+    visible: true,
+    onClick: () => {
       void submitOrder();
-    };
-
-    webApp.onEvent?.("mainButtonClicked", onMainButtonClick);
-    return () => webApp.offEvent?.("mainButtonClicked", onMainButtonClick);
-  }, [submitOrder]);
-
-  useEffect(() => {
-    const mainButton = window.Telegram?.WebApp?.MainButton;
-    if (!mainButton) {
-      return;
-    }
-
-    mainButton.setText(submitting ? "Submitting..." : "Подтвердить заказ");
-    mainButton.show();
-    if (canCheckout) {
-      mainButton.enable();
-    } else {
-      mainButton.disable();
-    }
-    return () => mainButton.hide();
-  }, [canCheckout, submitting]);
+    },
+  });
 
   if (!items.length) {
     return (
@@ -156,10 +194,8 @@ export default function CheckoutPage() {
             value={deliveryComment}
           />
         </div>
-        <Button disabled={!canCheckout} loading={submitting} onClick={() => void submitOrder()} type="primary">
-          Confirm order
-        </Button>
       </section>
     </main>
   );
 }
+

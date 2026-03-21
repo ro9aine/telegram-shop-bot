@@ -157,14 +157,12 @@ def main() -> None:
         if imported >= args.limit:
             break
 
-        article = row["article"]
         title = row["title"]
         price_raw = row["price"]
         description = row["description"]
-        source_url = row["link"]
         images_raw = row["images"]
 
-        if not article or not title or not price_raw:
+        if not title or not price_raw:
             skipped += 1
             continue
 
@@ -185,14 +183,12 @@ def main() -> None:
             subcategory_cache[sub_title] = subcategory
 
         product, _ = Product.objects.update_or_create(
-            source_article=article,
+            category=root_category,
+            subcategory=subcategory,
+            title=title[:255],
             defaults={
-                "category": root_category,
-                "subcategory": subcategory,
                 "description": description,
                 "price": price,
-                "title": title[:255],
-                "source_url": source_url,
                 "is_active": True,
             },
         )

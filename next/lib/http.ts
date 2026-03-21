@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getTelegramUserId, waitForTelegramUserId } from "./telegram";
+import { getTelegramInitData, getTelegramUserId, waitForTelegramInitData, waitForTelegramUserId } from "./telegram";
 
 export const browserApi = axios.create({
   baseURL: "/api/backend",
@@ -8,16 +8,23 @@ export const browserApi = axios.create({
 });
 
 browserApi.interceptors.request.use(async (config) => {
+  let telegramInitData = getTelegramInitData();
+  if (!telegramInitData) {
+    telegramInitData = await waitForTelegramInitData();
+  }
+
   let telegramUserId = getTelegramUserId();
   if (!telegramUserId) {
     telegramUserId = await waitForTelegramUserId();
   }
-  if (!telegramUserId) {
-    return config;
-  }
 
   const headers = config.headers ?? {};
-  (headers as Record<string, string>)["X-Telegram-User-Id"] = String(telegramUserId);
+  if (telegramUserId) {
+    (headers as Record<string, string>)["X-Telegram-User-Id"] = String(telegramUserId);
+  }
+  if (telegramInitData) {
+    (headers as Record<string, string>)["X-Telegram-Init-Data"] = telegramInitData;
+  }
   config.headers = headers;
   return config;
 });

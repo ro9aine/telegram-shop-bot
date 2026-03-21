@@ -29,6 +29,7 @@ type CheckoutResponse = {
   order?: {
     id: number;
     status: string;
+    payment_status: string;
     total_amount: string;
     items_count: number;
   };
@@ -114,6 +115,14 @@ export async function checkoutBasket(payload: CheckoutPayload): Promise<Checkout
     window.dispatchEvent(new CustomEvent("basket:changed", { detail: [] }));
   }
   return order ?? null;
+}
+
+export async function markOrderPaid(orderId: number): Promise<CheckoutResponse["order"] | null> {
+  const response = await browserApi.post<CheckoutResponse>(`/orders/${orderId}/mark-paid/`);
+  if (response.status < 200 || response.status >= 300) {
+    return null;
+  }
+  return response.data.order ?? null;
 }
 
 export function basketTotal(items: BasketItem[]): number {

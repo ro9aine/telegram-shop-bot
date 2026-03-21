@@ -7,7 +7,19 @@ from aiogram.types import (
 )
 from urllib.parse import urlparse, urlunparse
 
-from app.callbacks import CatalogBackCallback, CatalogCategoryCallback, CatalogPageCallback, CatalogProductCallback, CartAddCallback
+from app.callbacks import (
+    CatalogBackCallback,
+    CatalogCategoryCallback,
+    CatalogPageCallback,
+    CatalogProductCallback,
+    CartAddCallback,
+    CartChangeQtyCallback,
+    CartCheckoutCallback,
+    CartClearCallback,
+    CartRemoveCallback,
+    CheckoutFlowCallback,
+    OrderPaidCallback,
+)
 
 
 def _webapp_button(url: str) -> InlineKeyboardButton | None:
@@ -15,6 +27,14 @@ def _webapp_button(url: str) -> InlineKeyboardButton | None:
     if parsed.scheme != "https" or not parsed.netloc:
         return None
     return InlineKeyboardButton(text="Open in WebApp", web_app=WebAppInfo(url=url))
+
+
+def webapp_only_keyboard(url: str, text: str = "Open in WebApp") -> InlineKeyboardMarkup | None:
+    button = _webapp_button(url)
+    if button is None:
+        return None
+    button.text = text
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
 
 def _build_product_url(url: str, product_id: int) -> str:
@@ -159,3 +179,68 @@ def product_card_keyboard(
         rows.append([webapp_btn])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def cart_item_keyboard(product_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="-",
+                    callback_data=CartChangeQtyCallback(product_id=product_id, delta=-1).pack(),
+                ),
+                InlineKeyboardButton(
+                    text="+",
+                    callback_data=CartChangeQtyCallback(product_id=product_id, delta=1).pack(),
+                ),
+                InlineKeyboardButton(
+                    text="Remove",
+                    callback_data=CartRemoveCallback(product_id=product_id).pack(),
+                ),
+            ]
+        ]
+    )
+
+
+def cart_actions_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Clear cart",
+                    callback_data=CartClearCallback(confirm=1).pack(),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Checkout",
+                    callback_data=CartCheckoutCallback(start=1).pack(),
+                )
+            ],
+        ]
+    )
+
+
+def order_paid_keyboard(order_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Я оплатил(а)", callback_data=OrderPaidCallback(order_id=order_id).pack())]
+        ]
+    )
+
+
+def checkout_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Confirm order",
+                    callback_data=CheckoutFlowCallback(action="confirm").pack(),
+                ),
+                InlineKeyboardButton(
+                    text="Cancel",
+                    callback_data=CheckoutFlowCallback(action="cancel").pack(),
+                ),
+            ]
+        ]
+    )

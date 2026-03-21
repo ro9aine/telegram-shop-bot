@@ -1,10 +1,11 @@
 "use client";
 
 import { Button, Carousel } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
 import type { CarouselRef } from "antd/es/carousel";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { addToBasket, fetchBasket, updateBasketQuantity } from "../../../lib/basket";
+import { useTelegramBackButton } from "../../../lib/use-telegram-buttons";
 
 type Product = {
   id: number;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export default function ProductDetailClient({ product }: Props) {
+  const router = useRouter();
   const images = product.images.length ? product.images : [""];
   const [activeIndex, setActiveIndex] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -48,18 +50,28 @@ export default function ProductDetailClient({ product }: Props) {
     return () => window.removeEventListener("basket:changed", onBasketChanged);
   }, [product.id]);
 
+  useTelegramBackButton(() => router.back(), true);
+
+  const shareProduct = () => {
+    const botUsername = (process.env.NEXT_PUBLIC_BOT_USERNAME || "").trim().replace(/^@/, "");
+    if (!botUsername) {
+      window.Telegram?.WebApp?.showAlert?.("Bot username is not configured for sharing.");
+      return;
+    }
+    const deepLink = `https://t.me/${botUsername}?start=${product.id}`;
+    const shareLink = `https://t.me/share/url?url=${encodeURIComponent(deepLink)}`;
+    const webApp = window.Telegram?.WebApp;
+    if (webApp?.openTelegramLink) {
+      webApp.openTelegramLink(shareLink);
+      return;
+    }
+    window.open(shareLink, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <main className="product-page">
       <section className="product-shell">
         <div className="product-main-photo">
-          <Button
-            aria-label="Back to catalog"
-            className="product-back-btn product-back-overlay"
-            href="/"
-            icon={<ArrowLeftOutlined />}
-            shape="circle"
-            type="default"
-          />
           <Carousel
             beforeChange={(_, next) => setActiveIndex(next)}
             dots={false}
@@ -141,6 +153,9 @@ export default function ProductDetailClient({ product }: Props) {
                 Add to basket
               </Button>
             )}
+            <Button onClick={shareProduct} type="default">
+              Share
+            </Button>
           </div>
           {product.description ? (
             <>
