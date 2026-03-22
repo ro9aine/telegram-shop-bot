@@ -2,3 +2,12 @@ catalog_full.xlsx
 .env
 test-task.docx
 next/tsconfig.tsbuildinfo
+aiogram/logs/
+djg/shop/logs/
+aiogram/profiles.json
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+next/.next/
+next/node_modules/

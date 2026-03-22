@@ -9,16 +9,17 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "django (==5.2.9)",
+    "django-cors-headers (>=4.4,<5.0)",
     "djangorestframework (>=3.15,<4.0)",
+    "psycopg[binary] (>=3.1,<4.0)",
+    "python-dotenv (>=1.0,<2.0)",
     "pillow (>=10.0,<12.0)"
 ]
 
-[project.scripts]
-manage = "shop.manage:main"
-
 [tool.poetry]
 packages = [
-    { include = "shopcli" }
+    { include = "shop", from = "shop" },
+    { include = "botconfig", from = "shop" }
 ]
 
 [build-system]

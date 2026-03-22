@@ -1,104 +1,84 @@
 # Telegram Shop Bot
 
-Three-service project:
+Monorepo with 3 services:
 
-1. `aiogram` bot (Aiogram 3)
-2. `djg` admin/backend (Django)
-3. `next` WebApp (Next.js/TypeScript)
+- `aiogram`: Telegram bot (Aiogram 3)
+- `djg`: Django backend + admin panel + PostgreSQL models
+- `next`: Telegram WebApp (Next.js 15 + React 19)
 
-Services communicate through HTTP APIs exposed by Django.
+All business data is stored in Django. Bot and WebApp use Django HTTP APIs.
 
-## Architecture
+## Services and Ports
 
-- Django stores catalog, users, basket, orders, FAQ, broadcasts, and bot settings.
-- Aiogram uses Django APIs:
-  - public API (`/api/...`) for WebApp-compatible data contracts
-  - internal API (`/internal/...`) protected by `X-Internal-Token`
-- Next.js WebApp talks to Django API and validates Telegram `initData`.
+- `postgres`: PostgreSQL 16 (`localhost:5432`)
+- `djg`: Django (`http://localhost:8000`)
+- `next`: WebApp (`http://localhost:3000`)
+- `aiogram`: long-polling bot worker
 
-Why this approach:
+## Quick Start
 
-- single source of truth for business data (Django/PostgreSQL)
-- bot and WebApp share basket/orders consistently
-- no direct DB access from bot/frontend
+1. Create `.env` from the template:
 
-## Implemented Features
+```bash
+cp .env.example .env
+```
 
-- Registration by `/start` + `request_contact=True`
-- Required channel subscription middleware (dynamic list from admin)
-- Catalog with categories/subcategories, pagination, product cards, MediaGroup
-- Deep linking: `t.me/<bot>?start=product_<id>` and `t.me/<bot>?start=<id>`
-- Bot cart:
-  - list items
-  - quantity `+/-`
-  - remove
-  - clear
-  - checkout entry
-- FSM checkout in bot: recipient -> address -> confirm
-- Payment stub + `Я оплатил(а)` button (marks order payment status as paid)
-- Order status notifications to user on admin status change
-- Admin chat:
-  - auto notification for new orders
-  - inline status buttons
-  - `/admin_orders` command for active orders
-- FAQ inline query (`InlineQueryResultArticle`)
-- Broadcast queue from admin, sent by bot in background
-- Bot commands registration via `set_my_commands`
-- Custom middlewares:
-  - subscription check
-  - registration sync/injection
-  - update logging
-- Custom filter: `IsAdmin`
-- Admin:
-  - catalog CRUD (+ multiple product images)
-  - customers and orders
-  - FAQ CRUD
-  - broadcasts with statuses and delivery stats
-  - bot settings (`admin_chat_id`)
-  - paid orders export (CSV for Excel)
-- Telegram WebApp integration:
-  - backend `initData` validation
-  - theme params support
-  - Telegram Back/Main buttons usage
+2. Fill required secrets in `.env`:
 
-## Run
+- `BOT_TOKEN`
+- `NEXT_PUBLIC_BOT_USERNAME` (or `BOT_USERNAME`)
+- `INTERNAL_API_TOKEN`
+
+3. Start all services:
 
 ```bash
 docker compose up --build
 ```
 
-## Required Setup
-
-1. Copy `.env.example` to `.env` and fill secrets.
-2. Start stack with docker compose.
-3. Create superuser:
+4. Create Django superuser:
 
 ```bash
 docker compose exec djg python shop/manage.py createsuperuser
 ```
 
-4. Open Django admin and configure:
-   - required channels
-   - bot settings (`admin_chat_id`)
-   - catalog/FAQ/broadcasts
+5. Open Django admin:
+
+- `http://localhost:8000/admin/`
+- Configure required channels, catalog, FAQ, broadcasts, and bot settings.
 
 ## Environment Variables
 
-See `.env.example`.
+See `.env.example` for full list.
 
-Main variables:
+Important variables:
 
-- `BOT_TOKEN`
+- `BOT_TOKEN`, `BOT_USERNAME`, `NEXT_PUBLIC_BOT_USERNAME`
 - `INTERNAL_API_TOKEN`
-- `POSTGRES_*`
-- `DJANGO_API_BASE_URL`
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`
+- `DJANGO_API_BASE_URL`, `CATALOG_API_BASE_URL`, `NEXT_PUBLIC_CATALOG_API_BASE_URL`
 - `WEBAPP_CATALOG_URL`
-- `NEXT_PUBLIC_BOT_USERNAME`
-- `ADMIN_TELEGRAM_IDS`
+- `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`, `DJANGO_CORS_ALLOW_ALL_ORIGINS`
+- `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS`
+- `NEXT_ALLOWED_DEV_ORIGINS`
+
+## What Is Implemented
+
+- Registration via `/start` and contact sharing
+- Required channel subscription checks (from Django admin config)
+- Catalog browsing, deep links (`/start product_<id>`), product cards
+- Basket management and checkout flow
+- Order status updates and admin-chat notifications
+- FAQ inline query search
+- Broadcast queue processing by bot worker
+- Telegram WebApp integration with `initData` forwarding/validation
+
+## Logs
+
+- Bot logs: `aiogram/logs/bot.log`
+- Django logs: `djg/shop/logs/django.log`
 
 ## Notes
 
-- Logs are written with rotation:
-  - `aiogram/logs/bot.log`
-  - `djg/shop/logs/django.log`
-- DB migrations are applied on Django container start (`docker-compose` command).
+- Django migrations run automatically when `djg` container starts.
+- Python services are built from `requirements.txt`.
+- `pyproject.toml` is kept aligned for local Poetry-based workflows.

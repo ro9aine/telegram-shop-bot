@@ -1,10 +1,7 @@
 import json
-import logging
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-logger = logging.getLogger(__name__)
+from app.storage.internal_api import request_json
 
 PROFILE_STORE_PATH = Path(__file__).resolve().parent.parent.parent / "profiles.json"
 
@@ -43,28 +40,18 @@ def sync_profile(
     last_name: str,
     photo_url: str = "",
 ) -> bool:
-    payload = json.dumps(
-        {
+    payload = request_json(
+        url=f"{base_url.rstrip('/')}/internal/register-profile/",
+        internal_api_token=internal_api_token,
+        method="POST",
+        payload={
             "telegram_user_id": telegram_user_id,
             "phone_number": phone_number,
             "username": username,
             "first_name": first_name,
             "last_name": last_name,
             "photo_url": photo_url,
-        }
-    ).encode("utf-8")
-    request = Request(
-        f"{base_url.rstrip('/')}/internal/register-profile/",
-        data=payload,
-        method="POST",
-        headers={"Content-Type": "application/json"},
+        },
+        timeout=5,
     )
-    if internal_api_token:
-        request.add_header("X-Internal-Token", internal_api_token)
-
-    try:
-        with urlopen(request, timeout=5):
-            return True
-    except (HTTPError, URLError, TimeoutError) as exc:
-        logger.warning("Failed to sync profile to Django: %s", exc)
-        return False
+    return payload is not None

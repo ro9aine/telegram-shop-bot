@@ -14,12 +14,13 @@ _BOT_SETTINGS_CACHE: BotSettingsPayload | None = None
 _BOT_SETTINGS_CACHE_EXPIRES_AT = 0.0
 
 
-def _request_json(
+def request_json(
     *,
     url: str,
     internal_api_token: str | None,
     method: str = "GET",
     payload: dict | None = None,
+    timeout: int = 8,
 ) -> dict | None:
     body = None
     headers = {}
@@ -30,7 +31,7 @@ def _request_json(
     if internal_api_token:
         request.add_header("X-Internal-Token", internal_api_token)
     try:
-        with urlopen(request, timeout=8) as response:
+        with urlopen(request, timeout=timeout) as response:
             content = response.read().decode("utf-8")
             return json.loads(content) if content else {}
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
@@ -45,7 +46,7 @@ async def load_bot_settings(base_url: str, internal_api_token: str | None, cache
         return _BOT_SETTINGS_CACHE
 
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/bot-settings/",
         internal_api_token=internal_api_token,
     )
@@ -61,7 +62,7 @@ async def load_bot_settings(base_url: str, internal_api_token: str | None, cache
 
 async def load_active_orders(base_url: str, internal_api_token: str | None) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/orders/active/",
         internal_api_token=internal_api_token,
     )
@@ -73,7 +74,7 @@ async def load_active_orders(base_url: str, internal_api_token: str | None) -> l
 
 async def set_order_status(base_url: str, internal_api_token: str | None, order_id: int, status: str) -> bool:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/orders/{order_id}/status/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -85,7 +86,7 @@ async def set_order_status(base_url: str, internal_api_token: str | None, order_
 async def search_faq(base_url: str, internal_api_token: str | None, query: str, limit: int = 10) -> list[dict]:
     qs = urlencode({"q": query, "limit": str(limit)})
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/faq/search/?{qs}",
         internal_api_token=internal_api_token,
     )
@@ -97,7 +98,7 @@ async def search_faq(base_url: str, internal_api_token: str | None, query: str, 
 
 async def load_next_broadcast(base_url: str, internal_api_token: str | None) -> dict | None:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/broadcasts/next/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -117,7 +118,7 @@ async def mark_broadcast_complete(
     failed_count: int,
 ) -> bool:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/broadcasts/{broadcast_id}/complete/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -128,7 +129,7 @@ async def mark_broadcast_complete(
 
 async def load_internal_basket(base_url: str, internal_api_token: str | None, telegram_user_id: int) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/basket/{telegram_user_id}/",
         internal_api_token=internal_api_token,
     )
@@ -147,7 +148,7 @@ async def add_internal_basket_item(
     quantity: int = 1,
 ) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/basket/{telegram_user_id}/items/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -168,7 +169,7 @@ async def update_internal_basket_item(
     quantity: int,
 ) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/basket/{telegram_user_id}/items/{product_id}/",
         internal_api_token=internal_api_token,
         method="PATCH",
@@ -188,7 +189,7 @@ async def remove_internal_basket_item(
     product_id: int,
 ) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/basket/{telegram_user_id}/items/{product_id}/",
         internal_api_token=internal_api_token,
         method="DELETE",
@@ -201,7 +202,7 @@ async def remove_internal_basket_item(
 
 async def clear_internal_basket(base_url: str, internal_api_token: str | None, telegram_user_id: int) -> list[dict]:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/basket/{telegram_user_id}/clear/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -224,7 +225,7 @@ async def checkout_internal_order(
     delivery_comment: str = "",
 ) -> dict | None:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/orders/checkout/{telegram_user_id}/",
         internal_api_token=internal_api_token,
         method="POST",
@@ -243,7 +244,7 @@ async def checkout_internal_order(
 
 async def mark_internal_order_paid(base_url: str, internal_api_token: str | None, order_id: int) -> dict | None:
     payload = await asyncio.to_thread(
-        _request_json,
+        request_json,
         url=f"{base_url.rstrip('/')}/internal/orders/{order_id}/mark-paid/",
         internal_api_token=internal_api_token,
         method="POST",

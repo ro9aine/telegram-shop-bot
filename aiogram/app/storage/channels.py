@@ -1,25 +1,19 @@
 import asyncio
-import json
-import logging
 import time
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-logger = logging.getLogger(__name__)
+from app.storage.internal_api import request_json
+
 _CACHE: list[dict[str, str]] = []
 _CACHE_EXPIRES_AT = 0.0
 
 
 def _fetch_required_channels(base_url: str, internal_api_token: str | None) -> list[dict[str, str]] | None:
-    request = Request(f"{base_url.rstrip('/')}/internal/required-channels/")
-    if internal_api_token:
-        request.add_header("X-Internal-Token", internal_api_token)
-
-    try:
-        with urlopen(request, timeout=5) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError) as exc:
-        logger.warning("Failed to fetch required channels: %s", exc)
+    payload = request_json(
+        url=f"{base_url.rstrip('/')}/internal/required-channels/",
+        internal_api_token=internal_api_token,
+        timeout=5,
+    )
+    if payload is None:
         return None
 
     return payload.get("channels", [])
