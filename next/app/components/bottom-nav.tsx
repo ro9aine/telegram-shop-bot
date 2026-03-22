@@ -1,9 +1,11 @@
 "use client";
 
+import { Badge } from "antd";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DeleteOutlined, LoadingOutlined, ShopOutlined, SmileOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
+import { BasketItem, fetchBasket } from "../../lib/basket";
 
 function itemClass(pathname: string, href: string): string {
   const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -14,11 +16,35 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [activePath, setActivePath] = useState("");
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
+  const [basketCount, setBasketCount] = useState(0);
+  const isBasketActive = activePath.startsWith("/basket");
+  const basketIconColor = isBasketActive ? "var(--accent)" : "var(--muted)";
+
+  const applyBasketItems = (items: BasketItem[]) => {
+    setBasketCount(items.reduce((sum, item) => sum + item.quantity, 0));
+  };
 
   useEffect(() => {
     setActivePath(pathname);
     setLoadingPath(null);
   }, [pathname]);
+
+  useEffect(() => {
+    const sync = async () => applyBasketItems(await fetchBasket());
+    void sync();
+
+    const onBasketChanged = (event: Event) => {
+      const custom = event as CustomEvent<BasketItem[]>;
+      if (Array.isArray(custom.detail)) {
+        applyBasketItems(custom.detail);
+        return;
+      }
+      void sync();
+    };
+
+    window.addEventListener("basket:changed", onBasketChanged);
+    return () => window.removeEventListener("basket:changed", onBasketChanged);
+  }, []);
 
   useEffect(() => {
     if (!loadingPath) {
@@ -54,7 +80,15 @@ export default function BottomNav() {
         onClick={() => activate("/basket")}
         title="Basket"
       >
-        {loadingPath === "/basket" ? <LoadingOutlined spin /> : <DeleteOutlined />}
+        <Badge className="bottom-nav-badge" count={basketCount} overflowCount={99} offset={[6, 1]}>
+          <span className="bottom-nav-basket-icon">
+            {loadingPath === "/basket" ? (
+              <LoadingOutlined spin style={{ color: basketIconColor, fontSize: 34 }} />
+            ) : (
+              <DeleteOutlined style={{ color: basketIconColor, fontSize: 34 }} />
+            )}
+          </span>
+        </Badge>
       </Link>
       <Link
         aria-label="Profile"

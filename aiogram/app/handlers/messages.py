@@ -81,6 +81,7 @@ async def handle_help(message: Message) -> None:
         "/start - registration\n"
         "/catalog - product catalog\n"
         "/cart - open cart\n"
+        "/chat_id - show current chat id\n"
         "/help - help\n"
         "/admin_orders - active orders (admins only)"
     )

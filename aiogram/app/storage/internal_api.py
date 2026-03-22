@@ -9,7 +9,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
-_BOT_SETTINGS_CACHE: dict[str, int | None] | None = None
+BotSettingsPayload = dict[str, int | str | None]
+_BOT_SETTINGS_CACHE: BotSettingsPayload | None = None
 _BOT_SETTINGS_CACHE_EXPIRES_AT = 0.0
 
 
@@ -37,7 +38,7 @@ def _request_json(
         return None
 
 
-async def load_bot_settings(base_url: str, internal_api_token: str | None, cache_ttl: int) -> dict[str, int | None] | None:
+async def load_bot_settings(base_url: str, internal_api_token: str | None, cache_ttl: int) -> BotSettingsPayload | None:
     global _BOT_SETTINGS_CACHE, _BOT_SETTINGS_CACHE_EXPIRES_AT
     now = time.monotonic()
     if _BOT_SETTINGS_CACHE is not None and now < _BOT_SETTINGS_CACHE_EXPIRES_AT:
@@ -50,7 +51,10 @@ async def load_bot_settings(base_url: str, internal_api_token: str | None, cache
     )
     if payload is None:
         return None
-    _BOT_SETTINGS_CACHE = {"admin_chat_id": payload.get("admin_chat_id")}
+    _BOT_SETTINGS_CACHE = {
+        "admin_chat_id": payload.get("admin_chat_id"),
+        "admin_telegram_ids": payload.get("admin_telegram_ids"),
+    }
     _BOT_SETTINGS_CACHE_EXPIRES_AT = now + max(1, cache_ttl)
     return _BOT_SETTINGS_CACHE
 

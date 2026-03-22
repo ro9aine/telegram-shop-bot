@@ -154,6 +154,11 @@ export default function ProfilePage() {
 
       <section className="profile-orders">
         <h2>Orders</h2>
+        <div className="profile-order-actions" style={{ marginBottom: 10 }}>
+          <Link className="chip chip-active" href="/notifications">
+            Notifications
+          </Link>
+        </div>
         {!orders?.length ? (
           <p className="profile-orders-empty">No orders yet.</p>
         ) : (

@@ -38,6 +38,8 @@ from botconfig.views import (
     internal_faq_search_view,
     internal_order_mark_paid_view,
     internal_order_status_view,
+    notifications_list_view,
+    notifications_mark_read_view,
     order_mark_paid_view,
     orders_list_view,
     profile_me_view,
@@ -72,5 +74,7 @@ urlpatterns = [
     path("api/orders/checkout/", checkout_order_view),
     path("api/orders/<int:order_id>/mark-paid/", order_mark_paid_view),
     path("api/orders/", orders_list_view),
+    path("api/notifications/", notifications_list_view),
+    path("api/notifications/mark-read/", notifications_mark_read_view),
     path("api/profile/me/", profile_me_view),
 ]

@@ -77,7 +77,10 @@ export default function BasketPage() {
                 <div className="basket-item-price">{item.price}</div>
                 <div className="basket-item-controls">
                   <Button
-                    onClick={async () => setItems(await updateBasketQuantity(item.productId, item.quantity - 1))}
+                    onClick={async () => {
+                      const next = await updateBasketQuantity(item.productId, item.quantity - 1);
+                      setItems(next);
+                    }}
                     size="small"
                     type="default"
                   >
@@ -85,7 +88,10 @@ export default function BasketPage() {
                   </Button>
                   <span className="basket-item-qty">{item.quantity}</span>
                   <Button
-                    onClick={async () => setItems(await updateBasketQuantity(item.productId, item.quantity + 1))}
+                    onClick={async () => {
+                      const next = await updateBasketQuantity(item.productId, item.quantity + 1);
+                      setItems(next);
+                    }}
                     size="small"
                     type="default"
                   >
@@ -93,7 +99,10 @@ export default function BasketPage() {
                   </Button>
                   <Button
                     danger
-                    onClick={async () => setItems(await removeFromBasket(item.productId))}
+                    onClick={async () => {
+                      const next = await removeFromBasket(item.productId);
+                      setItems(next);
+                    }}
                     size="small"
                     type="text"
                   >
@@ -108,7 +117,9 @@ export default function BasketPage() {
             <div className="basket-total">Total: {total.toFixed(2)}</div>
             <Button
               danger
-              onClick={async () => setItems(await clearBasket())}
+              onClick={async () => {
+                setItems(await clearBasket());
+              }}
               type="default"
             >
               Clear basket

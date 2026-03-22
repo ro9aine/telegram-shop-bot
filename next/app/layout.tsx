@@ -6,6 +6,7 @@ import "antd/dist/reset.css";
 import "./globals.css";
 import AntdReact19Patch from "./components/antd-react19-patch";
 import BottomNav from "./components/bottom-nav";
+import NotificationsPoller from "./components/notifications-poller";
 import TelegramWebAppBridge from "./components/telegram-webapp-bridge";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
         <AntdReact19Patch />
         <TelegramWebAppBridge />
+        <NotificationsPoller />
         <AntdRegistry>
           {children}
           <BottomNav />

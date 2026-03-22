@@ -699,6 +699,17 @@ html {
   background: var(--accent-soft);
 }
 
+.bottom-nav-badge .ant-badge-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+
 @media (max-width: 640px) {
   .page {
     padding: 18px 10px 92px;

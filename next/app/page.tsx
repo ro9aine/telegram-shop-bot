@@ -157,14 +157,13 @@ export default function HomePage() {
                               applyBasketItems(await removeFromBasket(item.id));
                               return;
                             }
-                            applyBasketItems(
-                              await addToBasket({
-                                productId: item.id,
-                                title: item.title,
-                                price: item.price,
-                                image: item.images[0] ?? null,
-                              }),
-                            );
+                            const items = await addToBasket({
+                              productId: item.id,
+                              title: item.title,
+                              price: item.price,
+                              image: item.images[0] ?? null,
+                            });
+                            applyBasketItems(items);
                           } finally {
                             setBasketLoadingById((prev) => ({ ...prev, [item.id]: false }));
                           }

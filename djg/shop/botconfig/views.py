@@ -21,6 +21,7 @@ from .models import (
     RequiredChannel,
     Subcategory,
     TelegramProfile,
+    UserNotification,
 )
 
 
@@ -116,6 +117,7 @@ def _basket_payload(profile: TelegramProfile) -> dict[str, object]:
         BasketItem.objects.filter(profile=profile)
         .select_related("product")
         .prefetch_related("product__images")
+        .order_by("id")
     )
     return {"items": [_basket_item_payload(item) for item in items]}
 
@@ -152,6 +154,17 @@ def _order_payload(order: Order, items_count: int) -> dict[str, int | str]:
         "payment_status": order.payment_status,
         "total_amount": str(order.total_amount),
         "items_count": items_count,
+    }
+
+
+def _notification_payload(notification: UserNotification) -> dict[str, int | str | bool | None]:
+    return {
+        "id": notification.id,
+        "title": notification.title,
+        "body": notification.body,
+        "is_read": notification.is_read,
+        "created_at": notification.created_at.isoformat(),
+        "read_at": notification.read_at.isoformat() if notification.read_at else None,
     }
 
 
@@ -599,6 +612,34 @@ def orders_list_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidd
     return JsonResponse({"orders": payload})
 
 
+@require_GET
+def notifications_list_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden:
+    profile, error = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden(error or "Forbidden")
+
+    unread_only = str(request.GET.get("unread_only") or "").lower() in {"1", "true", "yes"}
+    items = UserNotification.objects.filter(profile=profile)
+    if unread_only:
+        items = items.filter(is_read=False)
+
+    payload = [_notification_payload(item) for item in items[:100]]
+    unread_count = UserNotification.objects.filter(profile=profile, is_read=False).count()
+    return JsonResponse({"items": payload, "unread_count": unread_count})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def notifications_mark_read_view(request: HttpRequest) -> JsonResponse | HttpResponseForbidden:
+    profile, error = _resolve_profile(request)
+    if profile is None:
+        return HttpResponseForbidden(error or "Forbidden")
+
+    now = timezone.now()
+    UserNotification.objects.filter(profile=profile, is_read=False).update(is_read=True, read_at=now)
+    return JsonResponse({"ok": True})
+
+
 def _order_details_payload(order: Order) -> dict[str, object]:
     return {
         "id": order.id,
@@ -661,6 +702,7 @@ def internal_bot_settings_view(request: HttpRequest) -> JsonResponse | HttpRespo
     return JsonResponse(
         {
             "admin_chat_id": settings_obj.admin_chat_id if settings_obj else None,
+            "admin_telegram_ids": settings_obj.admin_telegram_ids if settings_obj else "",
         }
     )
 

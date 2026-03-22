@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from .models import BotSettings, Order
+from .models import BotSettings, Order, UserNotification
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,11 @@ def _notify_order_status_changed(sender, instance: Order, created: bool, **kwarg
     text = (
         f"Order #{instance.id} status updated.\n"
         f"New status: {instance.get_status_display()}."
+    )
+    UserNotification.objects.create(
+        profile=instance.profile,
+        title=f"Order #{instance.id} status changed",
+        body=f"New status: {instance.get_status_display()}",
     )
     _send_telegram_message(bot_token=bot_token, chat_id=user_chat_id, text=text)
 

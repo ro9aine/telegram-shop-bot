@@ -211,7 +211,7 @@ class BroadcastAdmin(admin.ModelAdmin):
 
 @admin.register(BotSettings)
 class BotSettingsAdmin(admin.ModelAdmin):
-    list_display = ("admin_chat_id", "updated_at")
+    list_display = ("admin_chat_id", "admin_telegram_ids", "updated_at")
 
     def has_add_permission(self, request):
         if BotSettings.objects.exists():

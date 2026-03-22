@@ -21,6 +21,7 @@ BOT_COMMANDS = [
     BotCommand(command="start", description="Start bot"),
     BotCommand(command="catalog", description="Open catalog"),
     BotCommand(command="cart", description="Open cart"),
+    BotCommand(command="chat_id", description="Show current chat id"),
     BotCommand(command="help", description="Help"),
 ]
 

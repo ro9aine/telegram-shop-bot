@@ -228,6 +228,7 @@ class Broadcast(models.Model):
 
 class BotSettings(models.Model):
     admin_chat_id = models.BigIntegerField(null=True, blank=True)
+    admin_telegram_ids = models.TextField(blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -235,4 +236,21 @@ class BotSettings(models.Model):
         verbose_name_plural = "Bot settings"
 
     def __str__(self) -> str:
-        return f"Bot settings (admin_chat_id={self.admin_chat_id or '-'})"
+        return f"Bot settings (admin_chat_id={self.admin_chat_id or '-'}, admin_ids={self.admin_telegram_ids or '-'})"
+
+
+class UserNotification(models.Model):
+    profile = models.ForeignKey(TelegramProfile, on_delete=models.CASCADE, related_name="notifications")
+    title = models.CharField(max_length=255)
+    body = models.TextField(blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "User notification"
+        verbose_name_plural = "User notifications"
+
+    def __str__(self) -> str:
+        return f"{self.profile.telegram_user_id}: {self.title}"
